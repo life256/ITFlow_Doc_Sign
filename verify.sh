@@ -22,12 +22,36 @@ fail() { echo -e "  ${RED}✗${NC} $*"; ((fail_count++)); }
 warn_() { echo -e "  ${YELLOW}!${NC} $*"; ((warnings++)); }
 
 ITFLOW="${1:-}"
+
 if [ -z "$ITFLOW" ]; then
-    echo "Usage: ./verify.sh /path/to/itflow"
-    exit 1
+    # Try to auto-detect ITFlow
+    echo ""
+    echo -e "${CYAN}[INFO]${NC}  Searching for ITFlow installation..."
+    DETECTED=""
+    while IFS= read -r candidate; do
+        dir="$(dirname "$candidate")"
+        if [ -f "$dir/agent/post.php" ] && [ -f "$dir/functions.php" ] && [ -d "$dir/guest" ]; then
+            DETECTED="$dir"
+            break
+        fi
+    done < <(find /var/www /var/html /srv/www /srv/http /usr/share/nginx /opt 2>/dev/null -maxdepth 4 -name "config.php" -path "*/config.php" -type f 2>/dev/null || true)
+
+    if [ -n "$DETECTED" ]; then
+        echo -e "  ${GREEN}✓${NC} Found ITFlow at: $DETECTED"
+        echo ""
+        read -rp "Is this the correct location? (Y/n): " confirm
+        if [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+            read -rp "Enter the full path to your ITFlow installation: " ITFLOW
+        else
+            ITFLOW="$DETECTED"
+        fi
+    else
+        echo -e "  ${YELLOW}!${NC} Could not auto-detect ITFlow installation."
+        read -rp "Enter the full path to your ITFlow installation: " ITFLOW
+    fi
 fi
 
-ITFLOW="$(cd "$ITFLOW" 2>/dev/null && pwd)" || { echo "Directory not found: $1"; exit 1; }
+ITFLOW="$(cd "$ITFLOW" 2>/dev/null && pwd)" || { echo "Directory not found: ${1:-$ITFLOW}"; exit 1; }
 
 echo ""
 echo -e "${BOLD}ITFlow Document Signing Plugin - Verification${NC}"

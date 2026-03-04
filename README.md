@@ -74,10 +74,13 @@ The installer validates your ITFlow installation, copies all files, runs the dat
 git clone https://github.com/life256/ITFlow_Doc_Sign.git
 cd ITFlow_Doc_Sign
 chmod +x install.sh
-./install.sh /path/to/itflow
+./install.sh
 ```
 
+If no path is provided, the installer will automatically search `/var/www`, `/srv/www`, and other common web directories for an ITFlow installation and ask you to confirm the detected location. You can also pass a path directly: `./install.sh /your/itflow/path`
+
 The installer will:
+- Auto-detect your ITFlow installation (or accept a path argument)
 - Verify the target directory is a real ITFlow installation
 - Check for required PHP extensions and ITFlow core functions
 - Back up any files it overwrites (to `.signable_backup_YYYYMMDD_HHMMSS/`)
@@ -173,13 +176,15 @@ VALUES ('Signable Documents', '/agent/signable_documents.php', 'fas fa-file-sign
 ## Uninstall
 
 ```bash
-./uninstall.sh /path/to/itflow
+./uninstall.sh
 ```
+
+The uninstaller will auto-detect your ITFlow installation and ask you to confirm. You can also pass a path directly: `./uninstall.sh /your/itflow/path`
 
 This removes all plugin files and the sidebar link. Database tables are preserved by default (to protect signing data). To also drop tables:
 
 ```bash
-./uninstall.sh /path/to/itflow --drop-tables
+./uninstall.sh --drop-tables
 ```
 
 ## How It Works

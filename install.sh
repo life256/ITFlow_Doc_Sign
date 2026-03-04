@@ -37,14 +37,39 @@ fatal() { err "$*"; exit 1; }
 # ── Locate ourselves (the plugin source directory) ────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# ── Get ITFlow path ───────────────────────────────────────────────
+# ── Auto-detect or accept ITFlow path ─────────────────────────────
 ITFLOW="${1:-}"
 
+echo ""
+echo -e "${BOLD}ITFlow Document Signing Plugin - Installer${NC}"
+echo ""
+
 if [ -z "$ITFLOW" ]; then
-    echo ""
-    echo -e "${BOLD}ITFlow Document Signing Plugin - Installer${NC}"
-    echo ""
-    read -rp "Enter the full path to your ITFlow installation: " ITFLOW
+    # Try to auto-detect ITFlow by searching common web directories
+    info "Searching for ITFlow installation..."
+    DETECTED=""
+    while IFS= read -r candidate; do
+        dir="$(dirname "$candidate")"
+        # Verify it looks like ITFlow (has agent/post.php and functions.php)
+        if [ -f "$dir/agent/post.php" ] && [ -f "$dir/functions.php" ] && [ -d "$dir/guest" ]; then
+            DETECTED="$dir"
+            break
+        fi
+    done < <(find /var/www /var/html /srv/www /srv/http /usr/share/nginx /opt 2>/dev/null -maxdepth 4 -name "config.php" -path "*/config.php" -type f 2>/dev/null || true)
+
+    if [ -n "$DETECTED" ]; then
+        ok "Found ITFlow at: $DETECTED"
+        echo ""
+        read -rp "Is this the correct location? (Y/n): " confirm
+        if [ "$confirm" = "n" ] || [ "$confirm" = "N" ]; then
+            read -rp "Enter the full path to your ITFlow installation: " ITFLOW
+        else
+            ITFLOW="$DETECTED"
+        fi
+    else
+        warn "Could not auto-detect ITFlow installation."
+        read -rp "Enter the full path to your ITFlow installation: " ITFLOW
+    fi
 fi
 
 # Resolve to absolute path
