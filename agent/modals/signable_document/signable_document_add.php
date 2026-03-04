@@ -1,0 +1,120 @@
+<?php
+// Add Signable Document Modal
+// Expects $mysqli to be available from the parent page
+$clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clients WHERE client_archived_at IS NULL ORDER BY client_name ASC");
+?>
+
+<div class="modal fade" id="addSignableDocumentModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="post" action="post.php" enctype="multipart/form-data" autocomplete="off">
+                <div class="modal-header bg-dark">
+                    <h5 class="modal-title"><i class="fas fa-file-signature mr-2"></i>New Signable Document</h5>
+                    <button type="button" class="close text-white" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+
+                    <div class="form-group">
+                        <label>Title <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="title" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea class="form-control" name="description" rows="2"></textarea>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Client <span class="text-danger">*</span></label>
+                                <select class="form-control select2" name="client_id" id="addSignableClientSelect" required>
+                                    <option value="">Select a Client</option>
+                                    <?php while ($client = mysqli_fetch_assoc($clients_result)): ?>
+                                        <option value="<?php echo intval($client['client_id']); ?>">
+                                            <?php echo htmlspecialchars($client['client_name']); ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group">
+                                <label>Contact</label>
+                                <select class="form-control" name="contact_id" id="addSignableContactSelect">
+                                    <option value="0">Any Contact</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Document Type</label>
+                                <select class="form-control" name="type">
+                                    <option value="custom">Custom Document</option>
+                                    <option value="quote">Quote</option>
+                                    <option value="msa">MSA</option>
+                                    <option value="contract">Contract</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Date <span class="text-danger">*</span></label>
+                                <input type="date" class="form-control" name="date" value="<?php echo date('Y-m-d'); ?>" required>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="form-group">
+                                <label>Expiry Date</label>
+                                <input type="date" class="form-control" name="expire">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Document Content</label>
+                        <textarea class="form-control tinymcehtml" name="content" rows="10"></textarea>
+                        <small class="text-muted">Rich text content of the document to be signed.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Or Upload PDF</label>
+                        <input type="file" class="form-control-file" name="document_file" accept=".pdf">
+                        <small class="text-muted">Alternatively, upload a PDF document.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Notes (internal)</label>
+                        <textarea class="form-control" name="note" rows="2"></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white">
+                    <button type="submit" name="add_signable_document" class="btn btn-primary"><i class="fas fa-check mr-2"></i>Create Document</button>
+                    <button type="button" class="btn btn-light" data-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+$(document).ready(function() {
+    // Load contacts when client is selected
+    $('#addSignableClientSelect').on('change', function() {
+        var clientId = $(this).val();
+        var contactSelect = $('#addSignableContactSelect');
+        contactSelect.html('<option value="0">Any Contact</option>');
+        if (clientId) {
+            $.get('ajax.php?get_contacts&client_id=' + clientId, function(data) {
+                var contacts = JSON.parse(data);
+                contacts.forEach(function(contact) {
+                    contactSelect.append('<option value="' + contact.contact_id + '">' + contact.contact_name + ' (' + contact.contact_email + ')</option>');
+                });
+            });
+        }
+    });
+});
+</script>
