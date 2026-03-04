@@ -26,17 +26,10 @@
 
                     <div class="form-group">
                         <label>Email Body</label>
-                        <textarea class="form-control" name="email_body" id="sendSignableBody" rows="5">Hello,
-
-Please review and sign the attached document at your earliest convenience.
-
-Click the link below to view and sign:
-[SIGNING_LINK]
-
-Thank you.</textarea>
+                        <textarea class="form-control" name="email_body" id="sendSignableBody" rows="8"></textarea>
                     </div>
 
-                    <small class="text-muted">The placeholder [SIGNING_LINK] will be replaced with the actual signing URL.</small>
+                    <small class="text-muted"><i class="fas fa-info-circle mr-1"></i>The placeholder <code>[SIGNING_LINK]</code> will be replaced with the signing URL when sent.</small>
                 </div>
                 <div class="modal-footer bg-white">
                     <button type="submit" name="send_signable_document" class="btn btn-success"><i class="fas fa-paper-plane mr-2"></i>Send</button>
@@ -50,13 +43,25 @@ Thank you.</textarea>
 <script>
 function loadSendSignableDocument(id) {
     $('#sendSignableDocId').val(id);
-    // Pre-fill email from contact if available
-    $.get('ajax_signable.php?get_signable_document&signable_document_id=' + id, function(data) {
-        var doc = JSON.parse(data);
-        if (doc.contact_email) {
-            $('#sendSignableEmail').val(doc.contact_email);
+    $.ajax({
+        url: 'ajax_signable.php?get_signable_document&signable_document_id=' + id,
+        dataType: 'json',
+        success: function(doc) {
+            if (doc.contact_email) {
+                $('#sendSignableEmail').val(doc.contact_email);
+            }
+            var title = doc.signable_document_title || 'Document';
+            $('#sendSignableSubject').val('Action Required: ' + title);
+            $('#sendSignableBody').val(
+                'Hello,\n\n' +
+                'You have been sent a document that requires your signature:\n\n' +
+                '    ' + title + '\n\n' +
+                'Please click the link below to review and sign the document at your earliest convenience:\n\n' +
+                '[SIGNING_LINK]\n\n' +
+                'If you have any questions, please don\'t hesitate to get in touch.\n\n' +
+                'Kind regards'
+            );
         }
-        $('#sendSignableSubject').val('Please Sign: ' + doc.signable_document_title);
     });
 }
 </script>
