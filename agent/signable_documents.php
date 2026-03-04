@@ -72,7 +72,7 @@ $result = mysqli_query($mysqli, $sql);
         <h3 class="card-title mt-2"><i class="fas fa-file-signature mr-2"></i>Signable Documents</h3>
         <div class="card-tools">
             <a href="?archived=<?php echo $archived ? 0 : 1; ?>"
-               class="btn btn-<?php echo $archived ? 'primary' : 'default'; ?> mr-2">
+               class="btn btn-<?php echo $archived ? 'primary' : 'outline-secondary'; ?> mr-2">
                 <i class="fa fa-fw fa-archive mr-2"></i>Archived
             </a>
             <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addSignableDocumentModal">
