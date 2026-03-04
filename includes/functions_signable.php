@@ -66,6 +66,27 @@ function generateSignatureHash($document_content, $signature_data, $signer_email
 }
 
 /**
+ * Ensure the upload directory exists for a signable document.
+ * Returns the writable directory path, or false on failure.
+ * Uses 0750 permissions (owner rwx, group r-x, no world access).
+ */
+function ensureSignableUploadDir($document_id) {
+    $base_dir = "../uploads/signable_documents/";
+    if (!is_dir($base_dir)) {
+        if (!@mkdir($base_dir, 0750, true)) {
+            return false;
+        }
+    }
+    $doc_dir = $base_dir . intval($document_id) . "/";
+    if (!is_dir($doc_dir)) {
+        if (!@mkdir($doc_dir, 0750, true)) {
+            return false;
+        }
+    }
+    return is_writable($doc_dir) ? $doc_dir : false;
+}
+
+/**
  * Check if a signable document has expired
  */
 function isSignableExpired($expire_date) {

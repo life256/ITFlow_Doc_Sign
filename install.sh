@@ -345,17 +345,14 @@ if [ -d "$ITFLOW/uploads" ]; then
     fi
 fi
 
-# Try 770 first, fall back to 777 so the web server can always write
-if ! chmod 770 "$UPLOAD_DIR" 2>/dev/null; then
-    chmod 777 "$UPLOAD_DIR" 2>/dev/null || warn "Could not set permissions on upload dir (may need sudo)."
-fi
+chmod 750 "$UPLOAD_DIR" 2>/dev/null || warn "Could not set permissions on upload dir (may need sudo)."
 
 # Verify web server can write
 if [ -w "$UPLOAD_DIR" ]; then
     ok "Upload directory is writable."
 else
     warn "Upload directory may not be writable by the web server."
-    info "Run: sudo chown www-data:www-data $UPLOAD_DIR && sudo chmod 770 $UPLOAD_DIR"
+    info "Run: sudo chown -R www-data:www-data $UPLOAD_DIR && sudo chmod 750 $UPLOAD_DIR"
 fi
 ok "Upload directory: $UPLOAD_DIR"
 
