@@ -53,7 +53,7 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
                         <div class="col-md-4">
                             <div class="form-group">
                                 <label>Document Type</label>
-                                <select class="form-control" name="type">
+                                <select class="form-control" name="type" id="addSignableTypeSelect">
                                     <option value="custom">Custom Document</option>
                                     <option value="quote">Quote</option>
                                     <option value="msa">MSA</option>
@@ -73,6 +73,15 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
                                 <input type="date" class="form-control" name="expire">
                             </div>
                         </div>
+                    </div>
+
+                    <!-- Quote picker (shown when type = quote and client is selected) -->
+                    <div class="form-group" id="addSignableQuoteGroup" style="display:none;">
+                        <label>Select Quote</label>
+                        <select class="form-control" name="quote_id" id="addSignableQuoteSelect">
+                            <option value="0">-- Select a Quote --</option>
+                        </select>
+                        <small class="text-muted">Quote content will be loaded into the document.</small>
                     </div>
 
                     <div class="form-group">
@@ -103,8 +112,13 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
 
 <script>
 $(document).ready(function() {
+    var typeSelect = $('#addSignableTypeSelect');
+    var clientSelect = $('#addSignableClientSelect');
+    var quoteGroup = $('#addSignableQuoteGroup');
+    var quoteSelect = $('#addSignableQuoteSelect');
+
     // Load contacts when client is selected (uses ITFlow's built-in endpoint)
-    $('#addSignableClientSelect').on('change', function() {
+    clientSelect.on('change', function() {
         var clientId = $(this).val();
         var contactSelect = $('#addSignableContactSelect');
         contactSelect.html('<option value="0">Any Contact</option>');
@@ -118,6 +132,58 @@ $(document).ready(function() {
                 }
             });
         }
+        // Refresh quotes if type is quote
+        if (typeSelect.val() === 'quote') {
+            loadClientQuotes(clientId);
+        }
     });
+
+    // Show/hide quote picker based on type
+    typeSelect.on('change', function() {
+        if ($(this).val() === 'quote' && clientSelect.val()) {
+            loadClientQuotes(clientSelect.val());
+            quoteGroup.show();
+        } else {
+            quoteGroup.hide();
+            quoteSelect.html('<option value="0">-- Select a Quote --</option>');
+        }
+    });
+
+    // Load quote content when a quote is selected
+    quoteSelect.on('change', function() {
+        var quoteId = $(this).val();
+        if (quoteId && quoteId !== '0') {
+            $.get('ajax_signable.php?get_quote_content&quote_id=' + quoteId, function(data) {
+                var response = JSON.parse(data);
+                if (response.html) {
+                    var editor = tinymce.get($('#addSignableDocumentModal textarea.tinymcehtml').attr('id'));
+                    if (editor) {
+                        editor.setContent(response.html);
+                    }
+                }
+                if (response.title) {
+                    var titleInput = $('#addSignableDocumentModal input[name="title"]');
+                    if (!titleInput.val()) {
+                        titleInput.val(response.title);
+                    }
+                }
+            });
+        }
+    });
+
+    function loadClientQuotes(clientId) {
+        quoteSelect.html('<option value="0">-- Select a Quote --</option>');
+        if (clientId) {
+            $.get('ajax_signable.php?get_client_quotes&client_id=' + clientId, function(data) {
+                var response = JSON.parse(data);
+                if (response.quotes) {
+                    response.quotes.forEach(function(q) {
+                        quoteSelect.append('<option value="' + q.quote_id + '">' + q.quote_prefix + q.quote_number + ' - ' + q.quote_scope + ' (' + q.quote_status + ')</option>');
+                    });
+                }
+                quoteGroup.show();
+            });
+        }
+    }
 });
 </script>
