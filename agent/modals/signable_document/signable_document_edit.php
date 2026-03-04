@@ -77,16 +77,25 @@
 
 <script>
 function loadEditSignableDocument(id) {
+    // Set the document ID immediately (not inside the callback)
+    $('#editSignableDocId').val(id);
+
     $.get('ajax_signable.php?get_signable_document&signable_document_id=' + id, function(data) {
         var doc = JSON.parse(data);
-        $('#editSignableDocId').val(doc.signable_document_id);
         $('#editSignableTitle').val(doc.signable_document_title);
         $('#editSignableDescription').val(doc.signable_document_description);
         $('#editSignableType').val(doc.signable_document_type);
         $('#editSignableDate').val(doc.signable_document_date);
         $('#editSignableExpire').val(doc.signable_document_expire);
-        $('#editSignableContent').val(doc.signable_document_content);
         $('#editSignableNote').val(doc.signable_document_note);
+
+        // Set TinyMCE content if editor is initialized, otherwise set textarea
+        var editor = tinymce.get('editSignableContent');
+        if (editor) {
+            editor.setContent(doc.signable_document_content || '');
+        } else {
+            $('#editSignableContent').val(doc.signable_document_content);
+        }
     });
 }
 </script>

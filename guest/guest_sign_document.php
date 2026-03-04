@@ -7,9 +7,10 @@
  * URL: /guest/guest_sign_document.php?signable_document_id=X&url_key=Y
  */
 
-require_once("../config.php");
-require_once("../includes/functions.php");
-require_once("../includes/functions_signable.php");
+// Use DOCUMENT_ROOT for reliable path resolution (matches ITFlow convention)
+require_once $_SERVER['DOCUMENT_ROOT'] . '/config.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/functions.php';
+require_once $_SERVER['DOCUMENT_ROOT'] . '/includes/functions_signable.php';
 
 $signable_document_id = intval($_GET['signable_document_id'] ?? 0);
 $url_key = $_GET['url_key'] ?? '';

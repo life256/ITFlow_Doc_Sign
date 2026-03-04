@@ -103,17 +103,19 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
 
 <script>
 $(document).ready(function() {
-    // Load contacts when client is selected
+    // Load contacts when client is selected (uses ITFlow's built-in endpoint)
     $('#addSignableClientSelect').on('change', function() {
         var clientId = $(this).val();
         var contactSelect = $('#addSignableContactSelect');
         contactSelect.html('<option value="0">Any Contact</option>');
         if (clientId) {
-            $.get('ajax.php?get_contacts&client_id=' + clientId, function(data) {
-                var contacts = JSON.parse(data);
-                contacts.forEach(function(contact) {
-                    contactSelect.append('<option value="' + contact.contact_id + '">' + contact.contact_name + ' (' + contact.contact_email + ')</option>');
-                });
+            $.get('ajax.php?get_client_contacts&client_id=' + clientId, function(data) {
+                var response = JSON.parse(data);
+                if (response.contacts) {
+                    response.contacts.forEach(function(contact) {
+                        contactSelect.append('<option value="' + contact.contact_id + '">' + contact.contact_name + '</option>');
+                    });
+                }
             });
         }
     });

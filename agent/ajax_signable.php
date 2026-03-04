@@ -7,7 +7,9 @@
  * This should be included or called from the main agent/ajax.php handler.
  */
 
-require_once("includes/inc_all.php");
+require_once("../config.php");
+require_once("../functions.php");
+require_once("../includes/check_login.php");
 require_once("../includes/functions_signable.php");
 
 header('Content-Type: application/json');
