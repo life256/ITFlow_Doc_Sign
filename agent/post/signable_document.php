@@ -52,14 +52,17 @@ if (isset($_POST['add_signable_document'])) {
     if (!empty($uploaded_file_name) && !empty($uploaded_file_tmp) && $new_id) {
         $base_dir = "../uploads/signable_documents/";
         if (!is_dir($base_dir)) {
-            mkdir($base_dir, 0777, true);
+            @mkdir($base_dir, 0777, true);
         }
         $upload_dir = $base_dir . "$new_id/";
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
+            @mkdir($upload_dir, 0777, true);
         }
-        if (move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
+        if (is_dir($upload_dir) && move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
             mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$uploaded_file_name' WHERE signable_document_id = $new_id");
+        } else {
+            $_SESSION['alert_type'] = "warning";
+            $_SESSION['alert_message'] = "Document created but file upload failed. Check permissions on uploads/signable_documents/";
         }
     }
 
@@ -212,17 +215,28 @@ if (isset($_POST['add_signable_document'])) {
             // Save PDF to uploads - ensure base and document directories exist
             $base_dir = "../uploads/signable_documents/";
             if (!is_dir($base_dir)) {
-                mkdir($base_dir, 0777, true);
+                @mkdir($base_dir, 0777, true);
             }
             $upload_dir = $base_dir . "$new_id/";
             if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
+                @mkdir($upload_dir, 0777, true);
             }
-            $pdf_filename = preg_replace('/[^A-Za-z0-9_\-]/', '_', "Quote_{$q_prefix}{$q_number}") . '.pdf';
-            $pdf->Output($upload_dir . $pdf_filename, 'F');
 
-            $pdf_filename_escaped = mysqli_real_escape_string($mysqli, $pdf_filename);
-            mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$pdf_filename_escaped' WHERE signable_document_id = $new_id");
+            $pdf_filename = preg_replace('/[^A-Za-z0-9_\-]/', '_', "Quote_{$q_prefix}{$q_number}") . '.pdf';
+
+            if (is_dir($upload_dir) && is_writable($upload_dir)) {
+                $pdf->Output($upload_dir . $pdf_filename, 'F');
+                $pdf_filename_escaped = mysqli_real_escape_string($mysqli, $pdf_filename);
+                mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$pdf_filename_escaped' WHERE signable_document_id = $new_id");
+            } else {
+                // Directory not writable - save PDF content as string to DB as fallback
+                $pdf_content = $pdf->Output('', 'S');
+                $pdf_b64 = base64_encode($pdf_content);
+                mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$pdf_filename' WHERE signable_document_id = $new_id");
+                $_SESSION['alert_type'] = "warning";
+                $_SESSION['alert_message'] = "Document created but PDF could not be saved to disk. Run: sudo chown -R www-data:www-data " . realpath("../uploads") . "/signable_documents";
+                // Continue without the file - document is still created in DB
+            }
         }
     }
 
@@ -275,11 +289,11 @@ if (isset($_POST['edit_signable_document'])) {
     if (!empty($uploaded_file_name) && !empty($uploaded_file_tmp)) {
         $base_dir = "../uploads/signable_documents/";
         if (!is_dir($base_dir)) {
-            mkdir($base_dir, 0777, true);
+            @mkdir($base_dir, 0777, true);
         }
         $upload_dir = $base_dir . "$signable_document_id/";
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0777, true);
+            @mkdir($upload_dir, 0777, true);
         }
         if (move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
             mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$uploaded_file_name' WHERE signable_document_id = $signable_document_id");

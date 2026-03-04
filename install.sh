@@ -332,20 +332,31 @@ info "Creating uploads directory..."
 UPLOAD_DIR="$ITFLOW/uploads/signable_documents"
 mkdir -p "$UPLOAD_DIR"
 
-# Match ownership of existing uploads dir
+# Match ownership and permissions of existing uploads dir
 if [ -d "$ITFLOW/uploads" ]; then
     EXISTING_OWNER="$(stat -c '%U:%G' "$ITFLOW/uploads" 2>/dev/null || true)"
     if [ -n "$EXISTING_OWNER" ] && [ "$EXISTING_OWNER" != ":" ]; then
-        if chown "$EXISTING_OWNER" "$UPLOAD_DIR" 2>/dev/null; then
+        if chown -R "$EXISTING_OWNER" "$UPLOAD_DIR" 2>/dev/null; then
             ok "Upload directory ownership set to $EXISTING_OWNER"
         else
             warn "Could not set ownership to $EXISTING_OWNER (may need sudo)."
-            info "Run: sudo chown $EXISTING_OWNER $UPLOAD_DIR"
+            info "Run: sudo chown -R $EXISTING_OWNER $UPLOAD_DIR"
         fi
     fi
 fi
 
-chmod 770 "$UPLOAD_DIR" 2>/dev/null || warn "Could not set permissions on upload dir (may need sudo)."
+# Try 770 first, fall back to 777 so the web server can always write
+if ! chmod 770 "$UPLOAD_DIR" 2>/dev/null; then
+    chmod 777 "$UPLOAD_DIR" 2>/dev/null || warn "Could not set permissions on upload dir (may need sudo)."
+fi
+
+# Verify web server can write
+if [ -w "$UPLOAD_DIR" ]; then
+    ok "Upload directory is writable."
+else
+    warn "Upload directory may not be writable by the web server."
+    info "Run: sudo chown www-data:www-data $UPLOAD_DIR && sudo chmod 770 $UPLOAD_DIR"
+fi
 ok "Upload directory: $UPLOAD_DIR"
 
 echo ""
