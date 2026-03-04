@@ -50,9 +50,13 @@ if (isset($_POST['add_signable_document'])) {
 
     // Handle file upload
     if (!empty($uploaded_file_name) && !empty($uploaded_file_tmp) && $new_id) {
-        $upload_dir = "../uploads/signable_documents/$new_id/";
+        $base_dir = "../uploads/signable_documents/";
+        if (!is_dir($base_dir)) {
+            mkdir($base_dir, 0777, true);
+        }
+        $upload_dir = $base_dir . "$new_id/";
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0770, true);
+            mkdir($upload_dir, 0777, true);
         }
         if (move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
             mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$uploaded_file_name' WHERE signable_document_id = $new_id");
@@ -205,10 +209,14 @@ if (isset($_POST['add_signable_document'])) {
 
             $pdf->writeHTML($html, true, false, true, false, '');
 
-            // Save PDF to uploads
-            $upload_dir = "../uploads/signable_documents/$new_id/";
+            // Save PDF to uploads - ensure base and document directories exist
+            $base_dir = "../uploads/signable_documents/";
+            if (!is_dir($base_dir)) {
+                mkdir($base_dir, 0777, true);
+            }
+            $upload_dir = $base_dir . "$new_id/";
             if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0770, true);
+                mkdir($upload_dir, 0777, true);
             }
             $pdf_filename = preg_replace('/[^A-Za-z0-9_\-]/', '_', "Quote_{$q_prefix}{$q_number}") . '.pdf';
             $pdf->Output($upload_dir . $pdf_filename, 'F');
@@ -265,9 +273,13 @@ if (isset($_POST['edit_signable_document'])) {
 
     // Handle file upload
     if (!empty($uploaded_file_name) && !empty($uploaded_file_tmp)) {
-        $upload_dir = "../uploads/signable_documents/$signable_document_id/";
+        $base_dir = "../uploads/signable_documents/";
+        if (!is_dir($base_dir)) {
+            mkdir($base_dir, 0777, true);
+        }
+        $upload_dir = $base_dir . "$signable_document_id/";
         if (!is_dir($upload_dir)) {
-            mkdir($upload_dir, 0770, true);
+            mkdir($upload_dir, 0777, true);
         }
         if (move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
             mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$uploaded_file_name' WHERE signable_document_id = $signable_document_id");
