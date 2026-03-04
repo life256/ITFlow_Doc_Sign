@@ -183,18 +183,21 @@ DB_USER=""
 DB_PASS=""
 
 if [ -f "$ITFLOW/config.php" ]; then
-    # ITFlow stores DB config as PHP define() constants
-    DB_HOST="$(grep -oP "(?<=['\"]DATABASE_HOST['\"]\\s*,\\s*['\"])[^'\"]*" "$ITFLOW/config.php" 2>/dev/null || true)"
-    DB_NAME="$(grep -oP "(?<=['\"]DATABASE_NAME['\"]\\s*,\\s*['\"])[^'\"]*" "$ITFLOW/config.php" 2>/dev/null || true)"
-    DB_USER="$(grep -oP "(?<=['\"]DATABASE_USERNAME['\"]\\s*,\\s*['\"])[^'\"]*" "$ITFLOW/config.php" 2>/dev/null || true)"
-    DB_PASS="$(grep -oP "(?<=['\"]DATABASE_PASSWORD['\"]\\s*,\\s*['\"])[^'\"]*" "$ITFLOW/config.php" 2>/dev/null || true)"
-
-    # Fallback: try $db_ variable style (older ITFlow)
-    if [ -z "$DB_HOST" ]; then
-        DB_HOST="$(grep -oP '(?<=\$db_host\s*=\s*["\x27])[^"\x27]*' "$ITFLOW/config.php" 2>/dev/null || true)"
-        DB_NAME="$(grep -oP '(?<=\$db_name\s*=\s*["\x27])[^"\x27]*' "$ITFLOW/config.php" 2>/dev/null || true)"
-        DB_USER="$(grep -oP '(?<=\$db_username\s*=\s*["\x27])[^"\x27]*' "$ITFLOW/config.php" 2>/dev/null || true)"
-        DB_PASS="$(grep -oP '(?<=\$db_password\s*=\s*["\x27])[^"\x27]*' "$ITFLOW/config.php" 2>/dev/null || true)"
+    # Use PHP itself to reliably extract the DB variables from config.php
+    # This handles all ITFlow config formats ($dbhost, $db_host, define(), etc.)
+    if command -v php &>/dev/null; then
+        eval "$(php -r "
+            @include('$ITFLOW/config.php');
+            // ITFlow uses \$dbhost, \$dbusername, \$dbpassword, \$database
+            \$h = \$dbhost ?? \$db_host ?? (defined('DATABASE_HOST') ? DATABASE_HOST : '');
+            \$n = \$database ?? \$db_name ?? (defined('DATABASE_NAME') ? DATABASE_NAME : '');
+            \$u = \$dbusername ?? \$db_username ?? (defined('DATABASE_USERNAME') ? DATABASE_USERNAME : '');
+            \$p = \$dbpassword ?? \$db_password ?? (defined('DATABASE_PASSWORD') ? DATABASE_PASSWORD : '');
+            echo 'DB_HOST=' . escapeshellarg(\$h) . \"\n\";
+            echo 'DB_NAME=' . escapeshellarg(\$n) . \"\n\";
+            echo 'DB_USER=' . escapeshellarg(\$u) . \"\n\";
+            echo 'DB_PASS=' . escapeshellarg(\$p) . \"\n\";
+        " 2>/dev/null)" || true
     fi
 fi
 
