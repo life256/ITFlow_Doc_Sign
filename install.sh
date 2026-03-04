@@ -244,6 +244,7 @@ for f in \
     "agent/modals/signable_document/signable_document_edit.php" \
     "agent/modals/signable_document/signable_document_send.php" \
     "guest/guest_sign_document.php" \
+    "guest/guest_download_signed_pdf.php" \
     "js/signature_pad.js"
 do
     if [ -f "$ITFLOW/$f" ]; then
@@ -281,9 +282,11 @@ cp "$SCRIPT_DIR/agent/post/signable_document.php" "$ITFLOW/agent/post/"
 cp "$SCRIPT_DIR/agent/post/signable_document_model.php" "$ITFLOW/agent/post/"
 ok "agent/post/ handlers (auto-discovered by glob)"
 
-# Guest signing page
+# Guest pages (signing + PDF download)
 cp "$SCRIPT_DIR/guest/guest_sign_document.php" "$ITFLOW/guest/"
+cp "$SCRIPT_DIR/guest/guest_download_signed_pdf.php" "$ITFLOW/guest/"
 ok "guest/guest_sign_document.php"
+ok "guest/guest_download_signed_pdf.php"
 
 # Signature pad JS
 cp "$SCRIPT_DIR/js/signature_pad.js" "$ITFLOW/js/"
@@ -427,6 +430,7 @@ check_file "agent/modals/signable_document/signable_document_add.php"
 check_file "agent/modals/signable_document/signable_document_edit.php"
 check_file "agent/modals/signable_document/signable_document_send.php"
 check_file "guest/guest_sign_document.php"
+check_file "guest/guest_download_signed_pdf.php"
 check_file "js/signature_pad.js"
 
 # Check post handler registration
