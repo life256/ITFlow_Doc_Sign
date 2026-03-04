@@ -31,20 +31,4 @@ if (isset($_GET['get_signable_document'])) {
     exit();
 }
 
-// Get quotes for a client (for quote picker dropdown)
-if (isset($_GET['get_client_quotes'])) {
-    $client_id = intval($_GET['client_id']);
-    $sql = "SELECT quote_id, quote_prefix, quote_number, quote_scope, quote_status, quote_amount, quote_currency_code, quote_date
-        FROM quotes
-        WHERE quote_client_id = $client_id AND quote_archived_at IS NULL
-        ORDER BY quote_number DESC";
-    $result = mysqli_query($mysqli, $sql);
-    $quotes = [];
-    while ($row = mysqli_fetch_assoc($result)) {
-        $quotes[] = $row;
-    }
-    echo json_encode(['quotes' => $quotes]);
-    exit();
-}
-
 echo json_encode(['error' => 'Invalid request']);

@@ -75,15 +75,6 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
                         </div>
                     </div>
 
-                    <!-- Quote picker (shown when type = quote and client is selected) -->
-                    <div class="form-group" id="addSignableQuoteGroup" style="display:none;">
-                        <label>Select Quote</label>
-                        <select class="form-control" name="quote_id" id="addSignableQuoteSelect">
-                            <option value="0">-- Select a Quote --</option>
-                        </select>
-                        <small class="text-muted">Quote content will be loaded into the document.</small>
-                    </div>
-
                     <div class="form-group">
                         <label>Document Content</label>
                         <textarea class="form-control tinymcehtml" name="content" rows="10"></textarea>
@@ -112,13 +103,8 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
 
 <script>
 $(document).ready(function() {
-    var typeSelect = $('#addSignableTypeSelect');
-    var clientSelect = $('#addSignableClientSelect');
-    var quoteGroup = $('#addSignableQuoteGroup');
-    var quoteSelect = $('#addSignableQuoteSelect');
-
     // Load contacts when client is selected (uses ITFlow's built-in endpoint)
-    clientSelect.on('change', function() {
+    $('#addSignableClientSelect').on('change', function() {
         var clientId = $(this).val();
         var contactSelect = $('#addSignableContactSelect');
         contactSelect.html('<option value="0">Any Contact</option>');
@@ -132,58 +118,6 @@ $(document).ready(function() {
                 }
             });
         }
-        // Refresh quotes if type is quote
-        if (typeSelect.val() === 'quote') {
-            loadClientQuotes(clientId);
-        }
     });
-
-    // Show/hide quote picker based on type
-    typeSelect.on('change', function() {
-        if ($(this).val() === 'quote' && clientSelect.val()) {
-            loadClientQuotes(clientSelect.val());
-            quoteGroup.show();
-        } else {
-            quoteGroup.hide();
-            quoteSelect.html('<option value="0">-- Select a Quote --</option>');
-        }
-    });
-
-    // Auto-fill title when a quote is selected (PDF is generated server-side on submit)
-    quoteSelect.on('change', function() {
-        var selected = $(this).find('option:selected');
-        if (selected.val() && selected.val() !== '0') {
-            var titleInput = $('#addSignableDocumentModal input[name="title"]');
-            if (!titleInput.val()) {
-                titleInput.val(selected.text().trim());
-            }
-        }
-    });
-
-    function loadClientQuotes(clientId) {
-        quoteSelect.html('<option value="0">Loading...</option>');
-        if (clientId) {
-            $.ajax({
-                url: 'ajax_signable.php?get_client_quotes&client_id=' + clientId,
-                dataType: 'json',
-                success: function(response) {
-                    quoteSelect.html('<option value="0">-- Select a Quote --</option>');
-                    if (response.quotes && response.quotes.length > 0) {
-                        response.quotes.forEach(function(q) {
-                            quoteSelect.append('<option value="' + q.quote_id + '">' + q.quote_prefix + q.quote_number + ' - ' + q.quote_scope + ' (' + q.quote_status + ')</option>');
-                        });
-                    } else {
-                        quoteSelect.html('<option value="0">No quotes found for this client</option>');
-                    }
-                    quoteGroup.show();
-                },
-                error: function(xhr) {
-                    quoteSelect.html('<option value="0">Error loading quotes</option>');
-                    quoteGroup.show();
-                    console.error('Quote load error:', xhr.status, xhr.responseText);
-                }
-            });
-        }
-    }
 });
 </script>

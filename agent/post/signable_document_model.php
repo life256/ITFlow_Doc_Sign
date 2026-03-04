@@ -11,7 +11,6 @@
 $signable_document_id = intval($_POST['signable_document_id'] ?? $_GET['signable_document_id'] ?? 0);
 $client_id = intval($_POST['client_id'] ?? 0);
 $contact_id = intval($_POST['contact_id'] ?? 0);
-$quote_id = intval($_POST['quote_id'] ?? 0);
 
 // String fields - sanitized
 $title = mysqli_real_escape_string($mysqli, strip_tags(trim($_POST['title'] ?? '')));
