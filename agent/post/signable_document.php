@@ -196,19 +196,16 @@ if (isset($_POST['archive_signable_document'])) {
 }
 
 // ============================================================
-// EXPORT PDF - Generate PDF with TCPDF
+// EXPORT PDF - Generate PDF with shared function
 // ============================================================
 if (isset($_GET['export_signable_document_pdf'])) {
 
     enforceUserPermission('module_sales', 1);
 
     $pdf_id = intval($_GET['export_signable_document_pdf']);
-    $doc = mysqli_fetch_assoc(mysqli_query($mysqli, "SELECT sd.*, c.client_name, ct.contact_name, ct.contact_email
-        FROM signable_documents sd
-        LEFT JOIN clients c ON sd.signable_document_client_id = c.client_id
-        LEFT JOIN contacts ct ON sd.signable_document_contact_id = ct.contact_id
-        WHERE sd.signable_document_id = $pdf_id"));
 
+    // Fetch title for filename
+    $doc = mysqli_fetch_assoc(mysqli_query($mysqli, "SELECT signable_document_title FROM signable_documents WHERE signable_document_id = $pdf_id"));
     if (!$doc) {
         $_SESSION['alert_type'] = "error";
         $_SESSION['alert_message'] = "Document not found.";
@@ -216,175 +213,18 @@ if (isset($_GET['export_signable_document_pdf'])) {
         exit();
     }
 
-    require_once("../plugins/TCPDF/tcpdf.php");
-
-    $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
-    $pdf->SetCreator('ITFlow');
-    $pdf->SetAuthor($config_company_name);
-    $pdf->SetTitle($doc['signable_document_title']);
-    $pdf->SetMargins(15, 15, 15);
-    $pdf->setPrintHeader(false);
-    $pdf->setPrintFooter(false);
-    $pdf->AddPage();
-
-    // Header
-    $html = '<h2>' . htmlspecialchars($doc['signable_document_title']) . '</h2>';
-    $html .= '<table width="100%" cellpadding="3">';
-    $html .= '<tr><td width="50%"><strong>Client:</strong> ' . htmlspecialchars($doc['client_name']) . '</td>';
-    $html .= '<td width="50%"><strong>Date:</strong> ' . htmlspecialchars($doc['signable_document_date']) . '</td></tr>';
-    if ($doc['contact_name']) {
-        $html .= '<tr><td><strong>Contact:</strong> ' . htmlspecialchars($doc['contact_name']) . '</td>';
-        $html .= '<td><strong>Status:</strong> ' . htmlspecialchars($doc['signable_document_status']) . '</td></tr>';
-    }
-    $html .= '</table><hr>';
-
-    // Document content
-    if (!empty($doc['signable_document_content'])) {
-        $html .= $doc['signable_document_content'];
-    }
-
-    // Signatures inline on the document
-    $sigs = mysqli_query($mysqli, "SELECT * FROM signable_document_signatures WHERE signature_signable_document_id = $pdf_id ORDER BY signature_created_at ASC");
-    $sig_rows = [];
-    while ($sig = mysqli_fetch_assoc($sigs)) {
-        $sig_rows[] = $sig;
-    }
-
-    if (count($sig_rows) > 0) {
-        $html .= '<br><br>';
-        foreach ($sig_rows as $sig) {
-            $html .= '<table width="100%" cellpadding="8" style="border: 1px solid #333333;">';
-            $html .= '<tr>';
-            $html .= '<td width="55%" style="border-right: 1px solid #cccccc;">';
-            if (strpos($sig['signature_data'], 'data:image') === 0) {
-                $html .= '<img src="' . $sig['signature_data'] . '" width="180">';
-            }
-            $html .= '<br><span style="font-size: 8pt; color: #666666;">Electronically signed</span>';
-            $html .= '</td>';
-            $html .= '<td width="45%">';
-            $html .= '<strong>' . htmlspecialchars($sig['signature_signer_name']) . '</strong><br>';
-            $html .= '<span style="font-size: 9pt;">' . htmlspecialchars($sig['signature_signer_email']) . '</span><br>';
-            $html .= '<span style="font-size: 9pt; color: #555555;">' . htmlspecialchars($sig['signature_created_at']) . '</span>';
-            $html .= '</td>';
-            $html .= '</tr>';
-            $html .= '</table><br>';
-        }
-    }
-
-    $pdf->writeHTML($html, true, false, true, false, '');
-
-    // ============================================================
-    // SIGNING CERTIFICATE PAGE
-    // ============================================================
-    if (count($sig_rows) > 0) {
-        $pdf->AddPage();
-
-        $cert_html = '';
-
-        // Certificate header
-        $cert_html .= '<table width="100%" cellpadding="0">';
-        $cert_html .= '<tr><td style="border-bottom: 3px solid #333333;">';
-        $cert_html .= '<h1 style="color: #333333; font-size: 20pt; margin-bottom: 2px;">Certificate of Completion</h1>';
-        $cert_html .= '<span style="font-size: 9pt; color: #666666;">Electronic Signature Verification</span>';
-        $cert_html .= '</td></tr>';
-        $cert_html .= '</table><br>';
-
-        // Document details
-        $cert_html .= '<table width="100%" cellpadding="6" style="background-color: #f5f5f5; border: 1px solid #dddddd;">';
-        $cert_html .= '<tr><td colspan="2" style="border-bottom: 1px solid #dddddd;"><strong style="font-size: 11pt;">Document Details</strong></td></tr>';
-        $cert_html .= '<tr>';
-        $cert_html .= '<td width="35%" style="border-bottom: 1px solid #eeeeee;"><strong>Document Title:</strong></td>';
-        $cert_html .= '<td width="65%" style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($doc['signable_document_title']) . '</td>';
-        $cert_html .= '</tr>';
-        $cert_html .= '<tr>';
-        $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Document ID:</strong></td>';
-        $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . intval($doc['signable_document_id']) . '</td>';
-        $cert_html .= '</tr>';
-        $cert_html .= '<tr>';
-        $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Client:</strong></td>';
-        $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($doc['client_name']) . '</td>';
-        $cert_html .= '</tr>';
-        if ($doc['contact_name']) {
-            $cert_html .= '<tr>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Contact:</strong></td>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($doc['contact_name']) . '</td>';
-            $cert_html .= '</tr>';
-        }
-        $cert_html .= '<tr>';
-        $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Document Date:</strong></td>';
-        $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($doc['signable_document_date']) . '</td>';
-        $cert_html .= '</tr>';
-        $cert_html .= '<tr>';
-        $cert_html .= '<td><strong>Status:</strong></td>';
-        $cert_html .= '<td><span style="color: #28a745; font-weight: bold;">' . htmlspecialchars($doc['signable_document_status']) . '</span></td>';
-        $cert_html .= '</tr>';
-        $cert_html .= '</table><br>';
-
-        // Signature details for each signer
-        $signer_num = 0;
-        foreach ($sig_rows as $sig) {
-            $signer_num++;
-
-            $cert_html .= '<table width="100%" cellpadding="6" style="border: 1px solid #dddddd; margin-bottom: 8px;">';
-            $cert_html .= '<tr><td colspan="2" style="background-color: #f5f5f5; border-bottom: 1px solid #dddddd;"><strong style="font-size: 11pt;">Signer ' . $signer_num . '</strong></td></tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td width="35%" style="border-bottom: 1px solid #eeeeee;"><strong>Name:</strong></td>';
-            $cert_html .= '<td width="65%" style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($sig['signature_signer_name']) . '</td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Email:</strong></td>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($sig['signature_signer_email']) . '</td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Signed At:</strong></td>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($sig['signature_created_at']) . '</td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>IP Address:</strong></td>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">' . htmlspecialchars($sig['signature_signer_ip']) . '</td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>User Agent:</strong></td>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee; font-size: 7pt;">' . htmlspecialchars($sig['signature_signer_user_agent']) . '</td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;"><strong>Signature:</strong></td>';
-            $cert_html .= '<td style="border-bottom: 1px solid #eeeeee;">';
-            if (strpos($sig['signature_data'], 'data:image') === 0) {
-                $cert_html .= '<img src="' . $sig['signature_data'] . '" width="150">';
-            }
-            $cert_html .= '</td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '<tr>';
-            $cert_html .= '<td><strong>Integrity Hash:</strong></td>';
-            $cert_html .= '<td><span style="font-family: courier; font-size: 7pt;">' . htmlspecialchars($sig['signature_hash']) . '</span></td>';
-            $cert_html .= '</tr>';
-
-            $cert_html .= '</table><br>';
-        }
-
-        // Footer disclaimer
-        $cert_html .= '<br>';
-        $cert_html .= '<table width="100%" cellpadding="4">';
-        $cert_html .= '<tr><td style="border-top: 1px solid #cccccc; font-size: 8pt; color: #888888;">';
-        $cert_html .= 'This document was electronically signed via ITFlow. The integrity hash is a SHA-256 digest of the ';
-        $cert_html .= 'document content, signature data, signer email, and signing timestamp. Any modification to the original ';
-        $cert_html .= 'document after signing will invalidate this hash. This certificate serves as a record of the electronic ';
-        $cert_html .= 'signing event and the identity of the signer(s) as verified at the time of signing.';
-        $cert_html .= '</td></tr>';
-        $cert_html .= '</table>';
-
-        $pdf->writeHTML($cert_html, true, false, true, false, '');
+    $pdf_data = generateSignableDocumentPDF($mysqli, $pdf_id, $config_company_name);
+    if ($pdf_data === false) {
+        $_SESSION['alert_type'] = "error";
+        $_SESSION['alert_message'] = "Failed to generate PDF.";
+        header("Location: signable_document.php?signable_document_id=$pdf_id");
+        exit();
     }
 
     $filename = preg_replace('/[^a-zA-Z0-9_-]/', '_', $doc['signable_document_title']);
-    $pdf->Output("$filename.pdf", 'I');
+    header('Content-Type: application/pdf');
+    header('Content-Disposition: inline; filename="' . $filename . '.pdf"');
+    header('Content-Length: ' . strlen($pdf_data));
+    echo $pdf_data;
     exit();
 }

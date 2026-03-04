@@ -144,6 +144,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_signature'])) 
             customAction('signable_document_signed', $signable_document_id);
         }
 
+        // Email signed copy to signer with download link
+        $download_url = $config_base_url . "/guest/guest_download_signed_pdf.php?signable_document_id=$signable_document_id&url_key=" . urlencode($doc['signable_document_url_key']);
+
+        $email_body = "Hello " . htmlspecialchars($signer_name) . ",<br><br>";
+        $email_body .= "Thank you for signing <strong>" . htmlspecialchars($doc['signable_document_title']) . "</strong>.<br><br>";
+        $email_body .= "You can download your signed copy (including the Certificate of Completion) using the link below:<br><br>";
+        $email_body .= "<a href=\"" . htmlspecialchars($download_url) . "\">Download Signed Document (PDF)</a><br><br>";
+        $email_body .= "This link will remain active for your records.<br><br>";
+        $email_body .= "Regards,<br>" . htmlspecialchars($doc['company_name'] ?? '');
+
+        $company_name_safe = htmlspecialchars($doc['company_name'] ?? 'ITFlow');
+
+        if (function_exists('addToMailQueue')) {
+            // Email to signer
+            addToMailQueue([[
+                'from' => $config_mail_from_email,
+                'from_name' => $config_mail_from_name ?? $company_name_safe,
+                'recipient' => $signer_email,
+                'recipient_name' => $signer_name,
+                'subject' => "Your signed copy: " . $doc['signable_document_title'],
+                'body' => $email_body,
+            ]]);
+
+            // Also notify the company
+            addToMailQueue([[
+                'from' => $config_mail_from_email,
+                'from_name' => $config_mail_from_name ?? $company_name_safe,
+                'recipient' => $config_mail_from_email,
+                'recipient_name' => $config_mail_from_name ?? '',
+                'subject' => "Document signed: " . $doc['signable_document_title'] . " by $signer_name",
+                'body' => "The document <strong>" . htmlspecialchars($doc['signable_document_title']) . "</strong> has been signed by " . htmlspecialchars($signer_name) . " (" . htmlspecialchars($signer_email) . ").<br><br>"
+                    . "<a href=\"" . htmlspecialchars($download_url) . "\">Download Signed PDF</a>",
+            ]]);
+
+            addSignableHistory($mysqli, $signable_document_id, 'Emailed', "Signed copy emailed to $signer_email", $ip);
+        }
+
         $sign_success = true;
         $is_signed = true;
         $doc['signable_document_status'] = 'Signed';
@@ -262,7 +299,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['decline_document'])) 
         <div class="card-body text-center">
             <i class="fas fa-check-circle text-success fa-3x mb-3"></i>
             <h4 class="text-success">Document Signed Successfully</h4>
-            <p>Thank you for signing this document. A record of your signature has been saved.</p>
+            <p>Thank you for signing this document. A copy of the signed document has been emailed to you for your records.</p>
+            <a href="guest_download_signed_pdf.php?signable_document_id=<?php echo $signable_document_id; ?>&url_key=<?php echo urlencode($url_key); ?>" class="btn btn-outline-success mt-2" target="_blank">
+                <i class="fas fa-file-pdf mr-2"></i>Download Signed PDF
+            </a>
         </div>
     </div>
     <?php endif; ?>
