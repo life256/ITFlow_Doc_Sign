@@ -133,12 +133,11 @@ else
     [ "$confirm" = "y" ] || [ "$confirm" = "Y" ] || exit 1
 fi
 
-# Check for email sending function (sendSingleEmail or similar)
-if grep -rql "function sendSingleEmail\|function sendEmail\|function send_single_email" "$ITFLOW/includes/" "$ITFLOW/functions.php" "$ITFLOW/plugins/" 2>/dev/null; then
-    ok "Email sending function found."
+# Check for addToMailQueue (ITFlow's email delivery mechanism)
+if grep -rql "function addToMailQueue" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
+    ok "addToMailQueue() found."
 else
-    warn "Could not find email sending function. Email delivery for signing links may not work."
-    warn "You may need to update the POST handler to match your ITFlow's email function name."
+    warn "Could not find addToMailQueue(). Email delivery for signing links may not work."
 fi
 
 # Check for TCPDF
@@ -370,20 +369,20 @@ if [ "$RUN_DB_MIGRATION" = true ]; then
         fi
     fi
 
-    # Add sidebar link via custom_links (even if tables already existed)
+    # Add navigation link via custom_links (top nav bar, location=2)
     LINK_EXISTS=$(mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" \
-        -sNe "SELECT COUNT(*) FROM custom_links WHERE custom_link_url = '/agent/signable_documents.php'" 2>/dev/null || echo "0")
+        -sNe "SELECT COUNT(*) FROM custom_links WHERE custom_link_uri = 'signable_documents.php'" 2>/dev/null || echo "0")
 
     if [ "$LINK_EXISTS" -gt 0 ] 2>/dev/null; then
-        ok "Sidebar link already exists in custom_links."
+        ok "Navigation link already exists in custom_links."
     else
         if mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" -e "
-            INSERT INTO custom_links (custom_link_name, custom_link_url, custom_link_icon, custom_link_target)
-            VALUES ('Signable Documents', '/agent/signable_documents.php', 'fas fa-file-signature', '_self')" 2>/dev/null; then
-            ok "Sidebar link added to custom_links table."
+            INSERT INTO custom_links (custom_link_name, custom_link_uri, custom_link_icon, custom_link_location, custom_link_new_tab, custom_link_order)
+            VALUES ('Signable Docs', 'signable_documents.php', 'fas fa-file-signature', 2, 0, 99)" 2>/dev/null; then
+            ok "Navigation link added to top nav bar."
         else
-            warn "Could not insert sidebar link. The custom_links table may not exist in your ITFlow version."
-            warn "You may need to add 'Signable Documents' to your sidebar manually."
+            warn "Could not insert navigation link. The custom_links table may not exist in your ITFlow version."
+            warn "You can access Signable Documents directly at: /agent/signable_documents.php"
         fi
     fi
 else

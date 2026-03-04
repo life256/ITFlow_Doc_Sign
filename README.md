@@ -37,7 +37,7 @@ This plugin was developed against ITFlow 0.6+. It depends on these ITFlow core f
 |-----------|----------|----------------|
 | `enforceUserPermission()` | RBAC access control on all agent pages | All agent pages will break |
 | `validateCSRFToken()` | CSRF protection on all POST actions | All form submissions will break |
-| `sendSingleEmail()` | Sending signing link emails | Email delivery will break |
+| `addToMailQueue()` | Sending signing link emails | Email delivery will break |
 | `includes/inc_all.php` | Standard agent page bootstrapping | All agent pages will break |
 | `config.php` | Database connection, base URL, SMTP config | Everything will break |
 | `$config_base_url` | Building guest signing URLs | Signing links will be wrong |
@@ -285,7 +285,7 @@ This plugin relies on ITFlow core libraries that are already included in any sta
 - **TCPDF** (`/plugins/TCPDF/`) -- PDF generation
 - **TinyMCE** (`/plugins/tinymce/`) -- Rich text editing
 - **HTMLPurifier** (`/plugins/HTMLPurifier/`) -- XSS prevention (optional but recommended)
-- **PHPMailer** -- Email delivery (via ITFlow's `sendSingleEmail()`)
+- **PHPMailer** -- Email delivery (via ITFlow's `addToMailQueue()`)
 - **AdminLTE / Bootstrap 4** -- UI framework
 - **jQuery** -- DOM manipulation and AJAX
 

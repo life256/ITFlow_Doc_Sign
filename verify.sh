@@ -126,11 +126,11 @@ check_function() {
 check_function "enforceUserPermission" "RBAC access control"
 check_function "validateCSRFToken" "CSRF protection"
 
-# sendSingleEmail might be in a different location
-if grep -rql "function sendSingleEmail" "$ITFLOW/includes/" "$ITFLOW/functions.php" "$ITFLOW/plugins/" 2>/dev/null; then
-    ok "sendSingleEmail() - Email delivery"
+# addToMailQueue is ITFlow's email delivery mechanism
+if grep -rql "function addToMailQueue" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
+    ok "addToMailQueue() - Email delivery"
 else
-    warn_ "sendSingleEmail() not found (email sending may not work)"
+    warn_ "addToMailQueue() not found (email sending may not work)"
 fi
 
 # Check inc_all.php exists

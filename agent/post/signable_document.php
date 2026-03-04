@@ -147,20 +147,17 @@ if (isset($_POST['send_signable_document'])) {
 
     // Replace placeholder in email body (email fields are NOT sql-escaped)
     $body = str_replace('[SIGNING_LINK]', $signing_url, $email_body);
+    $body = nl2br(htmlspecialchars($body));
 
-    // Send email using ITFlow's PHPMailer setup
-    $mail = sendSingleEmail(
-        $config_smtp_host,
-        $config_smtp_port,
-        $config_smtp_encryption,
-        $config_smtp_username,
-        $config_smtp_password,
-        $email_to,
-        $email_subject,
-        $body,
-        $config_mail_from_email,
-        $config_mail_from_name
-    );
+    // Send email using ITFlow's mail queue
+    addToMailQueue([[
+        'from' => $config_mail_from_email,
+        'from_name' => $config_mail_from_name,
+        'recipient' => $email_to,
+        'recipient_name' => '',
+        'subject' => $email_subject,
+        'body' => $body,
+    ]]);
 
     // Update status to Sent if still Draft
     if ($doc['signable_document_status'] === 'Draft') {

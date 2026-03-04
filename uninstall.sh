@@ -142,7 +142,7 @@ info "Removing sidebar navigation link..."
 
 if [ "$HAS_DB" = true ]; then
     if mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" -e \
-        "DELETE FROM custom_links WHERE custom_link_url = '/agent/signable_documents.php'" 2>/dev/null; then
+        "DELETE FROM custom_links WHERE custom_link_uri = 'signable_documents.php'" 2>/dev/null; then
         ok "Sidebar link removed from custom_links table."
     else
         warn "Could not remove sidebar link (custom_links table may not exist)."
