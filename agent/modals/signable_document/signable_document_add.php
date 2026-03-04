@@ -149,25 +149,14 @@ $(document).ready(function() {
         }
     });
 
-    // Load quote content when a quote is selected
+    // Auto-fill title when a quote is selected (PDF is generated server-side on submit)
     quoteSelect.on('change', function() {
-        var quoteId = $(this).val();
-        if (quoteId && quoteId !== '0') {
-            $.get('ajax_signable.php?get_quote_content&quote_id=' + quoteId, function(data) {
-                var response = JSON.parse(data);
-                if (response.html) {
-                    var editor = tinymce.get($('#addSignableDocumentModal textarea.tinymcehtml').attr('id'));
-                    if (editor) {
-                        editor.setContent(response.html);
-                    }
-                }
-                if (response.title) {
-                    var titleInput = $('#addSignableDocumentModal input[name="title"]');
-                    if (!titleInput.val()) {
-                        titleInput.val(response.title);
-                    }
-                }
-            });
+        var selected = $(this).find('option:selected');
+        if (selected.val() && selected.val() !== '0') {
+            var titleInput = $('#addSignableDocumentModal input[name="title"]');
+            if (!titleInput.val()) {
+                titleInput.val(selected.text().trim());
+            }
         }
     });
 
