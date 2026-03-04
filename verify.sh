@@ -92,7 +92,7 @@ echo -e "${BOLD}ITFlow Dependencies (functions this plugin calls):${NC}"
 check_function() {
     local func="$1"
     local desc="$2"
-    if grep -rql "function $func" "$ITFLOW/includes/" 2>/dev/null; then
+    if grep -rql "function $func" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
         ok "$func() - $desc"
     else
         fail "$func() NOT FOUND - $desc"
@@ -103,7 +103,7 @@ check_function "enforceUserPermission" "RBAC access control"
 check_function "validateCSRFToken" "CSRF protection"
 
 # sendSingleEmail might be in a different location
-if grep -rql "function sendSingleEmail" "$ITFLOW/includes/" "$ITFLOW/plugins/" 2>/dev/null; then
+if grep -rql "function sendSingleEmail" "$ITFLOW/includes/" "$ITFLOW/functions.php" "$ITFLOW/plugins/" 2>/dev/null; then
     ok "sendSingleEmail() - Email delivery"
 else
     warn_ "sendSingleEmail() not found (email sending may not work)"

@@ -60,8 +60,9 @@ info "Validating ITFlow installation..."
 REQUIRED_FILES=(
     "config.php"
     "agent/post.php"
-    "includes/functions.php"
+    "functions.php"
     "guest"
+    "includes"
 )
 
 missing=0
@@ -90,7 +91,7 @@ else
 fi
 
 # Check for enforceUserPermission (core function we depend on)
-if grep -rql "function enforceUserPermission" "$ITFLOW/includes/" 2>/dev/null; then
+if grep -rql "function enforceUserPermission" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
     ok "enforceUserPermission() found."
 else
     warn "Could not find enforceUserPermission() in includes/. Your ITFlow version may be incompatible."
@@ -99,7 +100,7 @@ else
 fi
 
 # Check for validateCSRFToken
-if grep -rql "function validateCSRFToken" "$ITFLOW/includes/" 2>/dev/null; then
+if grep -rql "function validateCSRFToken" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
     ok "validateCSRFToken() found."
 else
     warn "Could not find validateCSRFToken() in includes/. Your ITFlow version may be incompatible."
@@ -108,7 +109,7 @@ else
 fi
 
 # Check for sendSingleEmail
-if grep -rql "function sendSingleEmail" "$ITFLOW/includes/" 2>/dev/null; then
+if grep -rql "function sendSingleEmail" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
     ok "sendSingleEmail() found."
 else
     warn "Could not find sendSingleEmail(). Email delivery for signing links may not work."
