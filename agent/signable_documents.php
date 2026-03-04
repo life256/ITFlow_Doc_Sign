@@ -36,8 +36,8 @@ $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $per_page = 25;
 $offset = ($page - 1) * $per_page;
 
-// Build query
-$where = "WHERE signable_document_archived_at IS NULL";
+// Build query (uses $archive_query from ITFlow's filter_header.php, included via inc_all.php)
+$where = "WHERE signable_document_$archive_query";
 if ($status_filter) {
     $where .= " AND signable_document_status = '$status_filter'";
 }
@@ -71,6 +71,10 @@ $result = mysqli_query($mysqli, $sql);
     <div class="card-header py-2">
         <h3 class="card-title mt-2"><i class="fas fa-file-signature mr-2"></i>Signable Documents</h3>
         <div class="card-tools">
+            <a href="?archived=<?php echo $archived ? 0 : 1; ?>"
+               class="btn btn-<?php echo $archived ? 'primary' : 'default'; ?> mr-2">
+                <i class="fa fa-fw fa-archive mr-2"></i>Archived
+            </a>
             <button type="button" class="btn btn-primary" data-toggle="modal" data-target="#addSignableDocumentModal">
                 <i class="fas fa-plus mr-2"></i>New Document
             </button>
@@ -80,6 +84,7 @@ $result = mysqli_query($mysqli, $sql);
     <div class="card-body">
         <!-- Filters -->
         <form method="get" autocomplete="off" class="mb-3">
+            <input type="hidden" name="archived" value="<?php echo $archived; ?>">
             <div class="row">
                 <div class="col-md-3">
                     <div class="input-group input-group-sm">
@@ -206,7 +211,7 @@ $result = mysqli_query($mysqli, $sql);
             <ul class="pagination pagination-sm justify-content-end mb-0">
                 <?php for ($i = 1; $i <= $total_pages; $i++): ?>
                 <li class="page-item <?php echo ($i === $page) ? 'active' : ''; ?>">
-                    <a class="page-link" href="?page=<?php echo $i; ?>&status=<?php echo urlencode($status_filter); ?>&q=<?php echo urlencode($search_query); ?>&client_id=<?php echo $client_filter; ?>">
+                    <a class="page-link" href="?page=<?php echo $i; ?>&status=<?php echo urlencode($status_filter); ?>&q=<?php echo urlencode($search_query); ?>&client_id=<?php echo $client_filter; ?>&archived=<?php echo $archived; ?>">
                         <?php echo $i; ?>
                     </a>
                 </li>
