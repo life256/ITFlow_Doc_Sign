@@ -161,16 +161,27 @@ $(document).ready(function() {
     });
 
     function loadClientQuotes(clientId) {
-        quoteSelect.html('<option value="0">-- Select a Quote --</option>');
+        quoteSelect.html('<option value="0">Loading...</option>');
         if (clientId) {
-            $.get('ajax_signable.php?get_client_quotes&client_id=' + clientId, function(data) {
-                var response = JSON.parse(data);
-                if (response.quotes) {
-                    response.quotes.forEach(function(q) {
-                        quoteSelect.append('<option value="' + q.quote_id + '">' + q.quote_prefix + q.quote_number + ' - ' + q.quote_scope + ' (' + q.quote_status + ')</option>');
-                    });
+            $.ajax({
+                url: 'ajax_signable.php?get_client_quotes&client_id=' + clientId,
+                dataType: 'json',
+                success: function(response) {
+                    quoteSelect.html('<option value="0">-- Select a Quote --</option>');
+                    if (response.quotes && response.quotes.length > 0) {
+                        response.quotes.forEach(function(q) {
+                            quoteSelect.append('<option value="' + q.quote_id + '">' + q.quote_prefix + q.quote_number + ' - ' + q.quote_scope + ' (' + q.quote_status + ')</option>');
+                        });
+                    } else {
+                        quoteSelect.html('<option value="0">No quotes found for this client</option>');
+                    }
+                    quoteGroup.show();
+                },
+                error: function(xhr) {
+                    quoteSelect.html('<option value="0">Error loading quotes</option>');
+                    quoteGroup.show();
+                    console.error('Quote load error:', xhr.status, xhr.responseText);
                 }
-                quoteGroup.show();
             });
         }
     }
