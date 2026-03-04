@@ -133,11 +133,12 @@ else
     [ "$confirm" = "y" ] || [ "$confirm" = "Y" ] || exit 1
 fi
 
-# Check for sendSingleEmail
-if grep -rql "function sendSingleEmail" "$ITFLOW/includes/" "$ITFLOW/functions.php" 2>/dev/null; then
-    ok "sendSingleEmail() found."
+# Check for email sending function (sendSingleEmail or similar)
+if grep -rql "function sendSingleEmail\|function sendEmail\|function send_single_email" "$ITFLOW/includes/" "$ITFLOW/functions.php" "$ITFLOW/plugins/" 2>/dev/null; then
+    ok "Email sending function found."
 else
-    warn "Could not find sendSingleEmail(). Email delivery for signing links may not work."
+    warn "Could not find email sending function. Email delivery for signing links may not work."
+    warn "You may need to update the POST handler to match your ITFlow's email function name."
 fi
 
 # Check for TCPDF
@@ -163,7 +164,7 @@ if command -v php &>/dev/null; then
     PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
     ok "PHP $PHP_VERSION found."
 
-    if php -m 2>/dev/null | grep -qi "fileinfo"; then
+    if php -r "exit(function_exists('finfo_open') ? 0 : 1);" 2>/dev/null; then
         ok "PHP fileinfo extension loaded."
     else
         warn "PHP fileinfo extension not detected. PDF upload MIME validation may fail."

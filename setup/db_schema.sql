@@ -56,12 +56,3 @@ CREATE TABLE IF NOT EXISTS `signable_document_history` (
     KEY `signable_history_signable_document_id` (`signable_history_signable_document_id`),
     CONSTRAINT `signable_doc_hist_fk` FOREIGN KEY (`signable_history_signable_document_id`) REFERENCES `signable_documents` (`signable_document_id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- Add sidebar link via ITFlow's custom_links table (if it exists)
--- This adds a "Signable Documents" link to the agent sidebar
-INSERT INTO `custom_links` (`custom_link_name`, `custom_link_url`, `custom_link_icon`, `custom_link_target`)
-SELECT 'Signable Documents', '/agent/signable_documents.php', 'fas fa-file-signature', '_self'
-FROM dual
-WHERE NOT EXISTS (
-    SELECT 1 FROM `custom_links` WHERE `custom_link_url` = '/agent/signable_documents.php'
-);
