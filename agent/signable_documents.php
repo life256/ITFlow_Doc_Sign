@@ -51,7 +51,7 @@ if ($search_query) {
 // Count total
 $count_sql = "SELECT COUNT(*) AS total FROM signable_documents $where";
 $count_result = mysqli_query($mysqli, $count_sql);
-$total_rows = mysqli_fetch_assoc($count_result)['total'];
+$total_rows = intval(mysqli_fetch_assoc($count_result)['total']);
 $total_pages = ceil($total_rows / $per_page);
 
 // Fetch documents
@@ -175,9 +175,13 @@ $result = mysqli_query($mysqli, $sql);
                                     </a>
                                     <?php endif; ?>
                                     <div class="dropdown-divider"></div>
-                                    <a class="dropdown-item text-danger confirm-link" href="post.php?archive_signable_document=<?php echo intval($doc['signable_document_id']); ?>">
-                                        <i class="fas fa-archive mr-2"></i>Archive
-                                    </a>
+                                    <form method="post" action="post.php" class="d-inline" onsubmit="return confirm('Are you sure you want to archive this document?')">
+                                        <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                                        <input type="hidden" name="archive_signable_document" value="<?php echo intval($doc['signable_document_id']); ?>">
+                                        <button type="submit" class="dropdown-item text-danger">
+                                            <i class="fas fa-archive mr-2"></i>Archive
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                         </td>

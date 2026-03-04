@@ -8,6 +8,7 @@ $clients_result = mysqli_query($mysqli, "SELECT client_id, client_name FROM clie
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="post" action="post.php" enctype="multipart/form-data" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                 <div class="modal-header bg-dark">
                     <h5 class="modal-title"><i class="fas fa-file-signature mr-2"></i>New Signable Document</h5>
                     <button type="button" class="close text-white" data-dismiss="modal">&times;</button>

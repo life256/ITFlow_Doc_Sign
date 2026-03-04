@@ -14,6 +14,7 @@ require_once("../includes/functions_signable.php");
 // ============================================================
 if (isset($_POST['add_signable_document'])) {
 
+    validateCSRFToken($_POST['csrf_token']);
     require_once("post/signable_document_model.php");
 
     enforceUserPermission('module_sales', 2);
@@ -48,12 +49,12 @@ if (isset($_POST['add_signable_document'])) {
     $new_id = mysqli_insert_id($mysqli);
 
     // Handle file upload
-    if (!empty($uploaded_file_name) && $new_id) {
+    if (!empty($uploaded_file_name) && !empty($uploaded_file_tmp) && $new_id) {
         $upload_dir = "../uploads/signable_documents/$new_id/";
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0770, true);
         }
-        if (move_uploaded_file($_FILES['document_file']['tmp_name'], $upload_dir . $uploaded_file_name)) {
+        if (move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
             mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$uploaded_file_name' WHERE signable_document_id = $new_id");
         }
     }
@@ -78,6 +79,7 @@ if (isset($_POST['add_signable_document'])) {
 // ============================================================
 if (isset($_POST['edit_signable_document'])) {
 
+    validateCSRFToken($_POST['csrf_token']);
     require_once("post/signable_document_model.php");
 
     enforceUserPermission('module_sales', 2);
@@ -103,12 +105,12 @@ if (isset($_POST['edit_signable_document'])) {
     );
 
     // Handle file upload
-    if (!empty($uploaded_file_name)) {
+    if (!empty($uploaded_file_name) && !empty($uploaded_file_tmp)) {
         $upload_dir = "../uploads/signable_documents/$signable_document_id/";
         if (!is_dir($upload_dir)) {
             mkdir($upload_dir, 0770, true);
         }
-        if (move_uploaded_file($_FILES['document_file']['tmp_name'], $upload_dir . $uploaded_file_name)) {
+        if (move_uploaded_file($uploaded_file_tmp, $upload_dir . $uploaded_file_name)) {
             mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_file_name = '$uploaded_file_name' WHERE signable_document_id = $signable_document_id");
         }
     }
@@ -127,6 +129,7 @@ if (isset($_POST['edit_signable_document'])) {
 // ============================================================
 if (isset($_POST['send_signable_document'])) {
 
+    validateCSRFToken($_POST['csrf_token']);
     require_once("post/signable_document_model.php");
 
     enforceUserPermission('module_sales', 2);
@@ -142,8 +145,8 @@ if (isset($_POST['send_signable_document'])) {
     // Build signing URL
     $signing_url = $config_base_url . "/guest/guest_sign_document.php?signable_document_id=$signable_document_id&url_key=" . urlencode($doc['signable_document_url_key']);
 
-    // Replace placeholder in email body
-    $body = str_replace('[SIGNING_LINK]', $signing_url, stripslashes($email_body));
+    // Replace placeholder in email body (email fields are NOT sql-escaped)
+    $body = str_replace('[SIGNING_LINK]', $signing_url, $email_body);
 
     // Send email using ITFlow's PHPMailer setup
     $mail = sendSingleEmail(
@@ -152,8 +155,8 @@ if (isset($_POST['send_signable_document'])) {
         $config_smtp_encryption,
         $config_smtp_username,
         $config_smtp_password,
-        stripslashes($email_to),
-        stripslashes($email_subject),
+        $email_to,
+        $email_subject,
         $body,
         $config_mail_from_email,
         $config_mail_from_name
@@ -164,7 +167,8 @@ if (isset($_POST['send_signable_document'])) {
         mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_status = 'Sent' WHERE signable_document_id = $signable_document_id");
     }
 
-    addSignableHistory($mysqli, $signable_document_id, 'Sent', "Document sent to " . stripslashes($email_to) . " by $session_name", $_SERVER['REMOTE_ADDR'] ?? null);
+    $email_to_escaped = mysqli_real_escape_string($mysqli, $email_to);
+    addSignableHistory($mysqli, $signable_document_id, 'Sent', "Document sent to $email_to_escaped by $session_name", $_SERVER['REMOTE_ADDR'] ?? null);
 
     if (function_exists('customAction')) {
         customAction('signable_document_send', $signable_document_id);
@@ -180,11 +184,12 @@ if (isset($_POST['send_signable_document'])) {
 // ============================================================
 // ARCHIVE - Soft delete
 // ============================================================
-if (isset($_GET['archive_signable_document'])) {
+if (isset($_POST['archive_signable_document'])) {
 
+    validateCSRFToken($_POST['csrf_token']);
     enforceUserPermission('module_sales', 3);
 
-    $archive_id = intval($_GET['archive_signable_document']);
+    $archive_id = intval($_POST['archive_signable_document']);
 
     mysqli_query($mysqli, "UPDATE signable_documents SET signable_document_archived_at = NOW() WHERE signable_document_id = $archive_id");
 

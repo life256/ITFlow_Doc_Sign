@@ -6,6 +6,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <form method="post" action="post.php" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                 <input type="hidden" name="signable_document_id" id="sendSignableDocId">
                 <div class="modal-header bg-dark">
                     <h5 class="modal-title"><i class="fas fa-paper-plane mr-2"></i>Send for Signature</h5>
@@ -50,7 +51,7 @@ Thank you.</textarea>
 function loadSendSignableDocument(id) {
     $('#sendSignableDocId').val(id);
     // Pre-fill email from contact if available
-    $.get('ajax.php?get_signable_document&signable_document_id=' + id, function(data) {
+    $.get('ajax_signable.php?get_signable_document&signable_document_id=' + id, function(data) {
         var doc = JSON.parse(data);
         if (doc.contact_email) {
             $('#sendSignableEmail').val(doc.contact_email);

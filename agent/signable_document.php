@@ -200,9 +200,13 @@ $page_title = htmlspecialchars($doc['signable_document_title']);
 
                 <?php if ($doc['signable_document_status'] !== 'Signed'): ?>
                 <hr>
-                <a href="post.php?archive_signable_document=<?php echo $signable_document_id; ?>" class="btn btn-block btn-outline-danger confirm-link">
-                    <i class="fas fa-archive mr-2"></i>Archive
-                </a>
+                <form method="post" action="post.php" onsubmit="return confirm('Are you sure you want to archive this document?')">
+                    <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
+                    <input type="hidden" name="archive_signable_document" value="<?php echo $signable_document_id; ?>">
+                    <button type="submit" class="btn btn-block btn-outline-danger">
+                        <i class="fas fa-archive mr-2"></i>Archive
+                    </button>
+                </form>
                 <?php endif; ?>
             </div>
         </div>

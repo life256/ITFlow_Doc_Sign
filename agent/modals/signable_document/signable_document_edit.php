@@ -6,6 +6,7 @@
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
             <form method="post" action="post.php" enctype="multipart/form-data" autocomplete="off">
+                <input type="hidden" name="csrf_token" value="<?php echo $_SESSION['csrf_token']; ?>">
                 <input type="hidden" name="signable_document_id" id="editSignableDocId">
                 <div class="modal-header bg-dark">
                     <h5 class="modal-title"><i class="fas fa-edit mr-2"></i>Edit Signable Document</h5>
@@ -51,7 +52,7 @@
 
                     <div class="form-group">
                         <label>Document Content</label>
-                        <textarea class="form-control" name="content" id="editSignableContent" rows="10"></textarea>
+                        <textarea class="form-control tinymcehtml" name="content" id="editSignableContent" rows="10"></textarea>
                     </div>
 
                     <div class="form-group">
@@ -76,7 +77,7 @@
 
 <script>
 function loadEditSignableDocument(id) {
-    $.get('ajax.php?get_signable_document&signable_document_id=' + id, function(data) {
+    $.get('ajax_signable.php?get_signable_document&signable_document_id=' + id, function(data) {
         var doc = JSON.parse(data);
         $('#editSignableDocId').val(doc.signable_document_id);
         $('#editSignableTitle').val(doc.signable_document_title);

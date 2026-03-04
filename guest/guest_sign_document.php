@@ -8,7 +8,7 @@
  */
 
 require_once("../config.php");
-require_once("../functions.php");
+require_once("../includes/functions.php");
 require_once("../includes/functions_signable.php");
 
 $signable_document_id = intval($_GET['signable_document_id'] ?? 0);
@@ -50,14 +50,16 @@ if (isSignableExpired($doc['signable_document_expire'])) {
     }
 }
 
-// Re-fetch to get updated status
+// Re-fetch to get updated status (still validate url_key for consistency)
 $doc = mysqli_fetch_assoc(mysqli_query($mysqli, "SELECT sd.*, c.client_name, ct.contact_name, ct.contact_email,
     comp.company_name, comp.company_logo
     FROM signable_documents sd
     LEFT JOIN clients c ON sd.signable_document_client_id = c.client_id
     LEFT JOIN contacts ct ON sd.signable_document_contact_id = ct.contact_id
     LEFT JOIN companies comp ON comp.company_id = 1
-    WHERE sd.signable_document_id = $signable_document_id"));
+    WHERE sd.signable_document_id = $signable_document_id
+      AND sd.signable_document_url_key = '$url_key_escaped'
+      AND sd.signable_document_archived_at IS NULL"));
 
 // Update to Viewed if Sent
 if ($doc['signable_document_status'] === 'Sent') {
@@ -88,6 +90,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['submit_signature'])) 
     // Validate
     if (empty($signer_name) || empty($signer_email) || empty($signature_data)) {
         $sign_error = 'Please fill in all fields and provide your signature.';
+    } elseif (strlen($signature_data) > 500000) {
+        $sign_error = 'Signature data is too large. Please clear and try again.';
+    } elseif (strpos($signature_data, 'data:image/') !== 0) {
+        $sign_error = 'Invalid signature data format.';
     } elseif (!filter_var($signer_email, FILTER_VALIDATE_EMAIL)) {
         $sign_error = 'Please enter a valid email address.';
     } elseif ($doc['signable_document_status'] === 'Signed') {
