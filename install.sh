@@ -241,7 +241,7 @@ if [ -f "$ITFLOW/agent/custom/includes/custom_side_nav.php" ]; then
     cp "$ITFLOW/agent/custom/includes/custom_side_nav.php" "$BACKUP_DIR/agent/custom/includes/"
 fi
 
-# Backup existing plugin files we might overwrite
+# Backup existing plugin files we might overwrite (both old and new locations)
 for f in \
     "includes/functions_signable.php" \
     "agent/custom/signable_documents.php" \
@@ -253,6 +253,14 @@ for f in \
     "agent/custom/modals/signable_document/signable_document_edit.php" \
     "agent/custom/modals/signable_document/signable_document_send.php" \
     "agent/custom/includes/signable_side_nav_snippet.php" \
+    "agent/signable_documents.php" \
+    "agent/signable_document.php" \
+    "agent/ajax_signable.php" \
+    "agent/post/signable_document.php" \
+    "agent/post/signable_document_model.php" \
+    "agent/modals/signable_document/signable_document_add.php" \
+    "agent/modals/signable_document/signable_document_edit.php" \
+    "agent/modals/signable_document/signable_document_send.php" \
     "guest/guest_sign_document.php" \
     "guest/guest_download_signed_pdf.php" \
     "js/signature_pad.js"
@@ -266,6 +274,59 @@ done
 
 ok "Backup created."
 echo ""
+
+# ── Migrate from old file locations (pre-custom-folder versions) ──
+MIGRATED=false
+
+for old_file in \
+    "agent/signable_documents.php" \
+    "agent/signable_document.php" \
+    "agent/ajax_signable.php" \
+    "agent/post/signable_document.php" \
+    "agent/post/signable_document_model.php" \
+    "agent/modals/signable_document/signable_document_add.php" \
+    "agent/modals/signable_document/signable_document_edit.php" \
+    "agent/modals/signable_document/signable_document_send.php"
+do
+    if [ -f "$ITFLOW/$old_file" ]; then
+        if [ "$MIGRATED" = false ]; then
+            info "Migrating from previous installation (agent/ → agent/custom/)..."
+            MIGRATED=true
+        fi
+        # Already backed up above, safe to remove
+        rm "$ITFLOW/$old_file"
+        ok "Removed old: $old_file"
+    fi
+done
+
+# Clean up empty old modal directory
+rmdir "$ITFLOW/agent/modals/signable_document" 2>/dev/null || true
+
+# Remove old post.php patch if present (from pre-custom-folder installer)
+if grep -qF 'require_once("post/signable_document.php")' "$ITFLOW/agent/post.php" 2>/dev/null; then
+    sed -i '/\/\/ ITFlow Document Signing Plugin/d' "$ITFLOW/agent/post.php"
+    sed -i '/require_once("post\/signable_document.php")/d' "$ITFLOW/agent/post.php"
+    sed -i '/^$/N;/^\n$/d' "$ITFLOW/agent/post.php"
+    ok "Removed legacy POST handler registration from agent/post.php"
+fi
+
+# Remove old custom_links sidebar entry (now using custom_side_nav.php injection)
+if [ "$RUN_DB_MIGRATION" = true ]; then
+    if mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" -e \
+        "DELETE FROM custom_links WHERE custom_link_uri = 'signable_documents.php'" 2>/dev/null; then
+        # Only report if a row was actually deleted
+        ROWS_DELETED=$(mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" \
+            -sNe "SELECT ROW_COUNT()" 2>/dev/null || echo "0")
+        if [ "$ROWS_DELETED" -gt 0 ] 2>/dev/null; then
+            ok "Removed old custom_links sidebar entry (now using custom sidebar)"
+        fi
+    fi
+fi
+
+if [ "$MIGRATED" = true ]; then
+    ok "Migration complete. Old files removed, backups preserved."
+    echo ""
+fi
 
 # ── Copy plugin files ─────────────────────────────────────────────
 info "Installing plugin files into agent/custom/..."
