@@ -6,7 +6,7 @@
 #   ./uninstall.sh /path/to/itflow
 #   ./uninstall.sh /path/to/itflow --drop-tables
 #
-# Removes all plugin files and sidebar link.
+# Removes all plugin files and sidebar navigation.
 # Does NOT drop database tables unless --drop-tables is passed.
 #
 
@@ -110,7 +110,7 @@ if [ -n "$DB_HOST" ] && [ -n "$DB_NAME" ] && [ -n "$DB_USER" ] && command -v mys
     fi
 fi
 
-# ── Remove plugin files ──────────────────────────────────────────
+# ── Remove plugin files from agent/custom/ ────────────────────────
 info "Removing plugin files..."
 
 remove_file() {
@@ -120,41 +120,70 @@ remove_file() {
     fi
 }
 
+# Files in agent/custom/
+remove_file "agent/custom/signable_documents.php"
+remove_file "agent/custom/signable_document.php"
+remove_file "agent/custom/ajax_signable.php"
+remove_file "agent/custom/post/signable_document.php"
+remove_file "agent/custom/post/signable_document_model.php"
+remove_file "agent/custom/modals/signable_document/signable_document_add.php"
+remove_file "agent/custom/modals/signable_document/signable_document_edit.php"
+remove_file "agent/custom/modals/signable_document/signable_document_send.php"
+remove_file "agent/custom/includes/signable_side_nav_snippet.php"
+
+# Shared includes and guest pages
 remove_file "includes/functions_signable.php"
-remove_file "agent/signable_documents.php"
-remove_file "agent/signable_document.php"
-remove_file "agent/ajax_signable.php"
-remove_file "agent/post/signable_document.php"
-remove_file "agent/post/signable_document_model.php"
-remove_file "agent/modals/signable_document/signable_document_add.php"
-remove_file "agent/modals/signable_document/signable_document_edit.php"
-remove_file "agent/modals/signable_document/signable_document_send.php"
 remove_file "guest/guest_sign_document.php"
+remove_file "guest/guest_download_signed_pdf.php"
 remove_file "js/signature_pad.js"
 
 # Remove modal directory if empty
-rmdir "$ITFLOW/agent/modals/signable_document" 2>/dev/null && ok "Removed empty agent/modals/signable_document/" || true
+rmdir "$ITFLOW/agent/custom/modals/signable_document" 2>/dev/null && ok "Removed empty agent/custom/modals/signable_document/" || true
+
+# Also clean up legacy file locations (from pre-custom-folder versions)
+for legacy in \
+    "agent/signable_documents.php" \
+    "agent/signable_document.php" \
+    "agent/ajax_signable.php" \
+    "agent/post/signable_document.php" \
+    "agent/post/signable_document_model.php" \
+    "agent/modals/signable_document/signable_document_add.php" \
+    "agent/modals/signable_document/signable_document_edit.php" \
+    "agent/modals/signable_document/signable_document_send.php"
+do
+    if [ -f "$ITFLOW/$legacy" ]; then
+        rm "$ITFLOW/$legacy"
+        ok "Removed legacy file: $legacy"
+    fi
+done
+rmdir "$ITFLOW/agent/modals/signable_document" 2>/dev/null || true
 
 echo ""
 
-# ── Remove sidebar link from custom_links ─────────────────────────
-info "Removing sidebar navigation link..."
+# ── Remove sidebar navigation from custom_side_nav.php ────────────
+info "Removing sidebar navigation..."
 
-if [ "$HAS_DB" = true ]; then
-    if mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" -e \
-        "DELETE FROM custom_links WHERE custom_link_uri = 'signable_documents.php'" 2>/dev/null; then
-        ok "Sidebar link removed from custom_links table."
-    else
-        warn "Could not remove sidebar link (custom_links table may not exist)."
-    fi
+SIDE_NAV="$ITFLOW/agent/custom/includes/custom_side_nav.php"
+MARKER_START="<!-- ITFlow Document Signing Plugin -->"
+MARKER_END="<!-- /ITFlow Document Signing Plugin -->"
+
+if [ -f "$SIDE_NAV" ] && grep -qF "$MARKER_START" "$SIDE_NAV"; then
+    # Remove everything between (and including) the markers
+    sed -i "/$MARKER_START/,/$MARKER_END/d" "$SIDE_NAV"
+    ok "Sidebar navigation removed from custom_side_nav.php"
 else
-    warn "No database connection. Remove sidebar link manually:"
-    echo "  DELETE FROM custom_links WHERE custom_link_url = '/agent/signable_documents.php';"
+    info "No sidebar navigation found to remove."
+fi
+
+# Also remove legacy custom_links entry (from pre-custom-folder versions)
+if [ "$HAS_DB" = true ]; then
+    mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" -e \
+        "DELETE FROM custom_links WHERE custom_link_uri = 'signable_documents.php'" 2>/dev/null || true
 fi
 
 echo ""
 
-# ── Remove post.php registration (if it was patched by older installer) ──
+# ── Remove legacy post.php registration ───────────────────────────
 POST_FILE="$ITFLOW/agent/post.php"
 if grep -qF 'require_once("post/signable_document.php")' "$POST_FILE" 2>/dev/null; then
     info "Removing legacy POST handler registration from agent/post.php..."

@@ -3,16 +3,11 @@
 /**
  * ITFlow Document Signing Plugin - Signable Documents List Page
  *
- * This page is included via the ITFlow custom extension mechanism.
- * It expects the standard ITFlow agent includes to be loaded (inc_all.php).
- *
- * Usage: Include this in your ITFlow installation at agent/signable_documents.php
- * and ensure inc_all.php is available.
+ * Lives in agent/custom/ and uses ITFlow's custom module bootstrap.
  */
 
-// Standard ITFlow agent includes
-require_once("includes/inc_all.php");
-require_once("../includes/functions_signable.php");
+require_once "includes/inc_all_custom.php";
+require_once "../../includes/functions_signable.php";
 
 // Module access check - uses sales module permission
 enforceUserPermission('module_sales', 1);
@@ -36,7 +31,7 @@ $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $per_page = 25;
 $offset = ($page - 1) * $per_page;
 
-// Build query (uses $archive_query from ITFlow's filter_header.php, included via inc_all.php)
+// Build query (uses $archive_query from ITFlow's filter_header.php, included via inc_all_custom.php)
 $where = "WHERE signable_document_$archive_query";
 if ($status_filter) {
     $where .= " AND signable_document_status = '$status_filter'";
@@ -138,7 +133,7 @@ $result = mysqli_query($mysqli, $sql);
                             </a>
                         </td>
                         <td>
-                            <a href="client_overview.php?client_id=<?php echo intval($doc['signable_document_client_id']); ?>">
+                            <a href="../client_overview.php?client_id=<?php echo intval($doc['signable_document_client_id']); ?>">
                                 <?php echo htmlspecialchars($doc['client_name']); ?>
                             </a>
                         </td>
@@ -228,4 +223,4 @@ require_once("modals/signable_document/signable_document_add.php");
 require_once("modals/signable_document/signable_document_edit.php");
 require_once("modals/signable_document/signable_document_send.php");
 
-require_once("../includes/footer.php");
+require_once "../../includes/footer.php";

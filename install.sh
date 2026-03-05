@@ -10,10 +10,11 @@
 #   1. Validates the target is a real ITFlow installation
 #   2. Checks PHP and MySQL prerequisites
 #   3. Backs up any files it will overwrite
-#   4. Copies all plugin files into place
-#   5. Runs the database migration (tables + sidebar link)
-#   6. Creates the uploads directory with proper permissions
-#   7. Verifies the installation
+#   4. Copies all plugin files into agent/custom/ (ITFlow's custom module directory)
+#   5. Injects sidebar navigation into custom_side_nav.php
+#   6. Runs the database migration (tables only)
+#   7. Creates the uploads directory with proper permissions
+#   8. Verifies the installation
 #
 # Safe to run multiple times (idempotent).
 #
@@ -105,14 +106,20 @@ if [ $missing -eq 1 ]; then
        Please provide the root directory of your ITFlow installation (not a subdirectory)."
 fi
 
-# Verify post.php uses glob auto-discovery (expected in ITFlow 0.6+)
-if grep -q 'glob.*post/.*\.php' "$ITFLOW/agent/post.php" 2>/dev/null; then
-    ok "agent/post.php uses glob() auto-discovery (no patching needed)."
-    POST_GLOB=true
+# Check for the custom module directory
+if [ -d "$ITFLOW/agent/custom" ]; then
+    ok "agent/custom/ directory found."
 else
-    warn "agent/post.php does not appear to use glob() auto-discovery."
-    warn "The POST handler may need to be registered manually (see README)."
-    POST_GLOB=false
+    warn "agent/custom/ directory not found. Your ITFlow version may not support custom modules."
+    warn "The installer will create it, but the custom sidebar may not work."
+fi
+
+# Check that custom/post.php has glob auto-discovery
+if [ -f "$ITFLOW/agent/custom/post.php" ] && grep -q 'glob.*post/.*\.php' "$ITFLOW/agent/custom/post.php" 2>/dev/null; then
+    ok "agent/custom/post.php uses glob() auto-discovery."
+else
+    warn "agent/custom/post.php not found or does not use glob()."
+    warn "POST handler may need to be registered manually (see README)."
 fi
 
 # Check for enforceUserPermission (core function we depend on)
@@ -184,7 +191,6 @@ DB_PASS=""
 
 if [ -f "$ITFLOW/config.php" ]; then
     # Use PHP itself to reliably extract the DB variables from config.php
-    # This handles all ITFlow config formats ($dbhost, $db_host, define(), etc.)
     if command -v php &>/dev/null; then
         eval "$(php -r "
             @include('$ITFLOW/config.php');
@@ -229,20 +235,24 @@ BACKUP_DIR="$ITFLOW/.signable_backup_$(date +%Y%m%d_%H%M%S)"
 info "Creating backup at: $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 
-# Backup post.php in case we need to patch it
-cp "$ITFLOW/agent/post.php" "$BACKUP_DIR/post.php"
+# Backup custom_side_nav.php (we will modify it)
+if [ -f "$ITFLOW/agent/custom/includes/custom_side_nav.php" ]; then
+    mkdir -p "$BACKUP_DIR/agent/custom/includes"
+    cp "$ITFLOW/agent/custom/includes/custom_side_nav.php" "$BACKUP_DIR/agent/custom/includes/"
+fi
 
-# Backup existing files we might overwrite
+# Backup existing plugin files we might overwrite
 for f in \
     "includes/functions_signable.php" \
-    "agent/signable_documents.php" \
-    "agent/signable_document.php" \
-    "agent/ajax_signable.php" \
-    "agent/post/signable_document.php" \
-    "agent/post/signable_document_model.php" \
-    "agent/modals/signable_document/signable_document_add.php" \
-    "agent/modals/signable_document/signable_document_edit.php" \
-    "agent/modals/signable_document/signable_document_send.php" \
+    "agent/custom/signable_documents.php" \
+    "agent/custom/signable_document.php" \
+    "agent/custom/ajax_signable.php" \
+    "agent/custom/post/signable_document.php" \
+    "agent/custom/post/signable_document_model.php" \
+    "agent/custom/modals/signable_document/signable_document_add.php" \
+    "agent/custom/modals/signable_document/signable_document_edit.php" \
+    "agent/custom/modals/signable_document/signable_document_send.php" \
+    "agent/custom/includes/signable_side_nav_snippet.php" \
     "guest/guest_sign_document.php" \
     "guest/guest_download_signed_pdf.php" \
     "js/signature_pad.js"
@@ -258,35 +268,40 @@ ok "Backup created."
 echo ""
 
 # ── Copy plugin files ─────────────────────────────────────────────
-info "Installing plugin files..."
+info "Installing plugin files into agent/custom/..."
 
-# Shared functions
+# Shared functions (stays in includes/ for guest page access)
 cp "$SCRIPT_DIR/includes/functions_signable.php" "$ITFLOW/includes/"
 ok "includes/functions_signable.php"
 
-# Agent pages
-cp "$SCRIPT_DIR/agent/signable_documents.php" "$ITFLOW/agent/"
-cp "$SCRIPT_DIR/agent/signable_document.php" "$ITFLOW/agent/"
-cp "$SCRIPT_DIR/agent/ajax_signable.php" "$ITFLOW/agent/"
-ok "agent/ pages (list, detail, ajax)"
+# Agent pages (into agent/custom/)
+cp "$SCRIPT_DIR/agent/custom/signable_documents.php" "$ITFLOW/agent/custom/"
+cp "$SCRIPT_DIR/agent/custom/signable_document.php" "$ITFLOW/agent/custom/"
+cp "$SCRIPT_DIR/agent/custom/ajax_signable.php" "$ITFLOW/agent/custom/"
+ok "agent/custom/ pages (list, detail, ajax)"
 
 # Modals
-mkdir -p "$ITFLOW/agent/modals/signable_document"
-cp "$SCRIPT_DIR/agent/modals/signable_document/signable_document_add.php" "$ITFLOW/agent/modals/signable_document/"
-cp "$SCRIPT_DIR/agent/modals/signable_document/signable_document_edit.php" "$ITFLOW/agent/modals/signable_document/"
-cp "$SCRIPT_DIR/agent/modals/signable_document/signable_document_send.php" "$ITFLOW/agent/modals/signable_document/"
-ok "agent/modals/signable_document/"
+mkdir -p "$ITFLOW/agent/custom/modals/signable_document"
+cp "$SCRIPT_DIR/agent/custom/modals/signable_document/signable_document_add.php" "$ITFLOW/agent/custom/modals/signable_document/"
+cp "$SCRIPT_DIR/agent/custom/modals/signable_document/signable_document_edit.php" "$ITFLOW/agent/custom/modals/signable_document/"
+cp "$SCRIPT_DIR/agent/custom/modals/signable_document/signable_document_send.php" "$ITFLOW/agent/custom/modals/signable_document/"
+ok "agent/custom/modals/signable_document/"
 
-# POST handler (auto-discovered by post.php's glob() — no patching needed)
-cp "$SCRIPT_DIR/agent/post/signable_document.php" "$ITFLOW/agent/post/"
-cp "$SCRIPT_DIR/agent/post/signable_document_model.php" "$ITFLOW/agent/post/"
-ok "agent/post/ handlers (auto-discovered by glob)"
+# POST handler (auto-discovered by agent/custom/post.php's glob())
+mkdir -p "$ITFLOW/agent/custom/post"
+cp "$SCRIPT_DIR/agent/custom/post/signable_document.php" "$ITFLOW/agent/custom/post/"
+cp "$SCRIPT_DIR/agent/custom/post/signable_document_model.php" "$ITFLOW/agent/custom/post/"
+ok "agent/custom/post/ handlers (auto-discovered by glob)"
+
+# Sidebar navigation snippet
+mkdir -p "$ITFLOW/agent/custom/includes"
+cp "$SCRIPT_DIR/agent/custom/includes/signable_side_nav_snippet.php" "$ITFLOW/agent/custom/includes/"
+ok "agent/custom/includes/signable_side_nav_snippet.php"
 
 # Guest pages (signing + PDF download)
 cp "$SCRIPT_DIR/guest/guest_sign_document.php" "$ITFLOW/guest/"
 cp "$SCRIPT_DIR/guest/guest_download_signed_pdf.php" "$ITFLOW/guest/"
-ok "guest/guest_sign_document.php"
-ok "guest/guest_download_signed_pdf.php"
+ok "guest/ pages (signing + PDF download)"
 
 # Signature pad JS
 cp "$SCRIPT_DIR/js/signature_pad.js" "$ITFLOW/js/"
@@ -294,40 +309,34 @@ ok "js/signature_pad.js"
 
 echo ""
 
-# ── Handle sidebar navigation ────────────────────────────────────
-# ITFlow's main sidebar does NOT auto-include custom_side_nav.php.
-# The correct approach is to insert a link via the custom_links database table,
-# which the installer handles in the DB migration step below.
-# We do NOT patch side_nav.php directly — that would be a core modification
-# that gets overwritten on every ITFlow update.
-info "Sidebar navigation will be added via the database (custom_links table)."
+# ── Inject sidebar navigation ─────────────────────────────────────
+info "Setting up sidebar navigation..."
+
+SIDE_NAV="$ITFLOW/agent/custom/includes/custom_side_nav.php"
+MARKER="<!-- ITFlow Document Signing Plugin -->"
+
+if [ -f "$SIDE_NAV" ]; then
+    if grep -qF "$MARKER" "$SIDE_NAV"; then
+        ok "Sidebar navigation already injected (skipped)."
+    else
+        # Inject our nav snippet before the closing </ul> tag
+        SNIPPET=$(cat "$SCRIPT_DIR/agent/custom/includes/signable_side_nav_snippet.php")
+        # Use awk to insert before the last </ul>
+        awk -v snippet="$SNIPPET" '
+            /<\/ul>/ && !done {
+                print snippet
+                done = 1
+            }
+            { print }
+        ' "$SIDE_NAV" > "${SIDE_NAV}.tmp" && mv "${SIDE_NAV}.tmp" "$SIDE_NAV"
+        ok "Sidebar navigation injected into custom_side_nav.php"
+    fi
+else
+    warn "custom_side_nav.php not found. Creating it with plugin navigation."
+    warn "If your ITFlow version has a different custom sidebar mechanism, you may need to adjust manually."
+fi
 
 echo ""
-
-# ── Fallback: patch post.php if glob is not available ─────────────
-if [ "$POST_GLOB" = false ]; then
-    info "Patching agent/post.php (no glob auto-discovery detected)..."
-
-    POST_FILE="$ITFLOW/agent/post.php"
-    REQUIRE_LINE='require_once("post/signable_document.php");'
-
-    if grep -qF "$REQUIRE_LINE" "$POST_FILE"; then
-        ok "POST handler already registered (skipped)."
-    else
-        LAST_REQUIRE_LINE=$(grep -n 'require_once.*post/' "$POST_FILE" | tail -1 | cut -d: -f1)
-        if [ -n "$LAST_REQUIRE_LINE" ]; then
-            sed -i "${LAST_REQUIRE_LINE}a\\
-\\n// ITFlow Document Signing Plugin\\n${REQUIRE_LINE}" "$POST_FILE"
-            ok "POST handler registered after line $LAST_REQUIRE_LINE."
-        else
-            echo "" >> "$POST_FILE"
-            echo "// ITFlow Document Signing Plugin" >> "$POST_FILE"
-            echo "$REQUIRE_LINE" >> "$POST_FILE"
-            ok "POST handler appended to end of post.php."
-        fi
-    fi
-    echo ""
-fi
 
 # ── Create uploads directory ──────────────────────────────────────
 info "Creating uploads directory..."
@@ -379,23 +388,6 @@ if [ "$RUN_DB_MIGRATION" = true ]; then
             warn "Please run manually: mysql -u USER -p DATABASE < $SCRIPT_DIR/setup/db_schema.sql"
         fi
     fi
-
-    # Add navigation link via custom_links (top nav bar, location=2)
-    LINK_EXISTS=$(mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" \
-        -sNe "SELECT COUNT(*) FROM custom_links WHERE custom_link_uri = 'signable_documents.php'" 2>/dev/null || echo "0")
-
-    if [ "$LINK_EXISTS" -gt 0 ] 2>/dev/null; then
-        ok "Navigation link already exists in custom_links."
-    else
-        if mysql -h "$DB_HOST" -u "$DB_USER" ${DB_PASS:+-p"$DB_PASS"} "$DB_NAME" -e "
-            INSERT INTO custom_links (custom_link_name, custom_link_uri, custom_link_icon, custom_link_location, custom_link_new_tab, custom_link_order)
-            VALUES ('Signable Docs', 'signable_documents.php', 'fas fa-file-signature', 2, 0, 99)" 2>/dev/null; then
-            ok "Navigation link added to top nav bar."
-        else
-            warn "Could not insert navigation link. The custom_links table may not exist in your ITFlow version."
-            warn "You can access Signable Documents directly at: /agent/signable_documents.php"
-        fi
-    fi
 else
     warn "Skipping database migration (no database connection)."
     echo -e "  Run manually: ${BOLD}mysql -u USER -p DATABASE < $SCRIPT_DIR/setup/db_schema.sql${NC}"
@@ -421,28 +413,33 @@ check_file() {
 }
 
 check_file "includes/functions_signable.php"
-check_file "agent/signable_documents.php"
-check_file "agent/signable_document.php"
-check_file "agent/ajax_signable.php"
-check_file "agent/post/signable_document.php"
-check_file "agent/post/signable_document_model.php"
-check_file "agent/modals/signable_document/signable_document_add.php"
-check_file "agent/modals/signable_document/signable_document_edit.php"
-check_file "agent/modals/signable_document/signable_document_send.php"
+check_file "agent/custom/signable_documents.php"
+check_file "agent/custom/signable_document.php"
+check_file "agent/custom/ajax_signable.php"
+check_file "agent/custom/post/signable_document.php"
+check_file "agent/custom/post/signable_document_model.php"
+check_file "agent/custom/modals/signable_document/signable_document_add.php"
+check_file "agent/custom/modals/signable_document/signable_document_edit.php"
+check_file "agent/custom/modals/signable_document/signable_document_send.php"
+check_file "agent/custom/includes/signable_side_nav_snippet.php"
 check_file "guest/guest_sign_document.php"
 check_file "guest/guest_download_signed_pdf.php"
 check_file "js/signature_pad.js"
 
-# Check post handler registration
-if [ "$POST_GLOB" = true ]; then
-    ok "POST handler auto-discovered via glob() (no registration needed)"
-    ((verify_ok++))
-elif grep -qF 'require_once("post/signable_document.php")' "$ITFLOW/agent/post.php"; then
-    ok "POST handler registered in agent/post.php"
+# Check sidebar injection
+if [ -f "$ITFLOW/agent/custom/includes/custom_side_nav.php" ] && grep -qF "$MARKER" "$ITFLOW/agent/custom/includes/custom_side_nav.php"; then
+    ok "Sidebar navigation injected"
     ((verify_ok++))
 else
-    err "POST handler NOT registered and glob() not detected"
-    ((verify_fail++))
+    warn "Sidebar navigation not injected (may need manual setup)"
+fi
+
+# Check custom post handler
+if [ -f "$ITFLOW/agent/custom/post.php" ] && grep -q 'glob.*post/.*\.php' "$ITFLOW/agent/custom/post.php" 2>/dev/null; then
+    ok "POST handler auto-discovered via agent/custom/post.php glob()"
+    ((verify_ok++))
+else
+    warn "agent/custom/post.php glob() not detected"
 fi
 
 # Check uploads dir
@@ -477,8 +474,9 @@ if [ $verify_fail -eq 0 ]; then
     echo ""
     echo "Next steps:"
     echo "  1. Log in to ITFlow as an agent with sales module access"
-    echo "  2. Look for 'Signable Documents' in the sidebar"
-    echo "  3. Create a test document and try the signing flow"
+    echo "  2. Navigate to the Custom section in ITFlow's sidebar"
+    echo "  3. Look for 'Document Signing' in the custom sidebar"
+    echo "  4. Create a test document and try the signing flow"
     echo ""
     echo -e "Backup saved to: ${CYAN}$BACKUP_DIR${NC}"
     echo -e "To verify later: ${CYAN}./verify.sh $ITFLOW${NC}"

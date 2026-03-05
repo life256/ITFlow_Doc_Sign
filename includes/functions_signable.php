@@ -71,7 +71,8 @@ function generateSignatureHash($document_content, $signature_data, $signer_email
  * Uses 0750 permissions (owner rwx, group r-x, no world access).
  */
 function ensureSignableUploadDir($document_id) {
-    $base_dir = "../uploads/signable_documents/";
+    // Use DOCUMENT_ROOT for reliable path resolution regardless of calling script location
+    $base_dir = $_SERVER['DOCUMENT_ROOT'] . "/uploads/signable_documents/";
     if (!is_dir($base_dir)) {
         if (!@mkdir($base_dir, 0750, true)) {
             return false;

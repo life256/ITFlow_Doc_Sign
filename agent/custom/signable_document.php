@@ -4,8 +4,8 @@
  * ITFlow Document Signing Plugin - Single Signable Document Detail Page
  */
 
-require_once("includes/inc_all.php");
-require_once("../includes/functions_signable.php");
+require_once "includes/inc_all_custom.php";
+require_once "../../includes/functions_signable.php";
 
 enforceUserPermission('module_sales', 1);
 
@@ -64,7 +64,7 @@ $page_title = htmlspecialchars($doc['signable_document_title']);
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <strong>Client:</strong>
-                        <a href="client_overview.php?client_id=<?php echo intval($doc['client_id']); ?>">
+                        <a href="../client_overview.php?client_id=<?php echo intval($doc['client_id']); ?>">
                             <?php echo htmlspecialchars($doc['client_name']); ?>
                         </a><br>
                         <strong>Contact:</strong> <?php echo htmlspecialchars($doc['contact_name'] ?? 'Any contact'); ?><br>
@@ -107,7 +107,7 @@ $page_title = htmlspecialchars($doc['signable_document_title']);
                 <hr>
                 <div class="mb-3">
                     <strong>Attached PDF:</strong>
-                    <a href="../uploads/signable_documents/<?php echo intval($doc['signable_document_id']); ?>/<?php echo htmlspecialchars($doc['signable_document_file_name']); ?>" target="_blank">
+                    <a href="../../uploads/signable_documents/<?php echo intval($doc['signable_document_id']); ?>/<?php echo htmlspecialchars($doc['signable_document_file_name']); ?>" target="_blank">
                         <i class="fas fa-file-pdf mr-1"></i><?php echo htmlspecialchars($doc['signable_document_file_name']); ?>
                     </a>
                 </div>
@@ -251,4 +251,4 @@ function copyGuestUrl() {
 require_once("modals/signable_document/signable_document_edit.php");
 require_once("modals/signable_document/signable_document_send.php");
 
-require_once("../includes/footer.php");
+require_once "../../includes/footer.php";

@@ -8,24 +8,23 @@ An electronic document signing plugin for [ITFlow](https://itflow.org), the open
 - **Guest signing page** accessible via a secure, unique URL (no login required)
 - **Canvas-based signature capture** with mouse and touch support
 - **Status lifecycle**: Draft → Sent → Viewed → Signed / Declined / Expired
-- **PDF export** with embedded signatures via TCPDF
+- **PDF export** with embedded signatures and Certificate of Completion via TCPDF
 - **Email delivery** of signing links through ITFlow's existing mail system
+- **Auto-email signed copy** to signer after signing, with PDF download link
 - **Full audit trail** with timestamped history, IP addresses, and user agents
 - **SHA-256 integrity hashing** for each signature (document + signature + email + timestamp)
 - **Agent notifications** when a document is viewed, signed, or declined
 - **CSRF protection** on all forms and state-changing operations
 - **RBAC integration** using ITFlow's existing `module_sales` permissions
 
-## Important: Plugin or Core Modification?
+## How It Integrates with ITFlow
 
-**This is a hybrid -- 95% plugin, 5% core-adjacent.** Understanding this distinction matters for maintenance:
+This plugin uses ITFlow's **`agent/custom/`** directory, the recommended location for custom modules. This approach:
 
-- **Plugin-like (safe)**: Adds new standalone PHP pages, new database tables, new JS, and new shared functions. Does not alter any existing ITFlow table schemas or core PHP files.
-- **POST handler**: Automatically discovered by ITFlow's `agent/post.php` via its `glob("post/*.php")` pattern. No core file editing needed.
-- **Sidebar link**: Added via ITFlow's `custom_links` database table. No core file editing needed.
-- **Files in tracked directories**: Plugin files are placed in `agent/`, `includes/`, `guest/`, and `js/`. These directories are tracked by git, but since the plugin uses unique filenames that don't exist in ITFlow core, a `git pull` update will not overwrite them.
-
-**No core ITFlow files are modified by this plugin.**
+- **Does not modify any core ITFlow files** -- all plugin files live in `agent/custom/`, `includes/`, `guest/`, and `js/`
+- **POST handler**: Automatically discovered by `agent/custom/post.php` via its `glob("post/*.php")` pattern
+- **Sidebar navigation**: Injected into `agent/custom/includes/custom_side_nav.php` (the custom module sidebar)
+- **Survives ITFlow updates**: Since files live in `agent/custom/` with unique filenames, a `git pull` update will not overwrite them
 
 ## Compatibility Warnings
 
@@ -38,7 +37,8 @@ This plugin was developed against ITFlow 0.6+. It depends on these ITFlow core f
 | `enforceUserPermission()` | RBAC access control on all agent pages | All agent pages will break |
 | `validateCSRFToken()` | CSRF protection on all POST actions | All form submissions will break |
 | `addToMailQueue()` | Sending signing link emails | Email delivery will break |
-| `includes/inc_all.php` | Standard agent page bootstrapping | All agent pages will break |
+| `agent/custom/includes/inc_all_custom.php` | Custom module page bootstrapping | All agent pages will break |
+| `agent/custom/post.php` | POST handler with glob() auto-discovery | Form submissions will break |
 | `config.php` | Database connection, base URL, SMTP config | Everything will break |
 | `$config_base_url` | Building guest signing URLs | Signing links will be wrong |
 | `$session_user_id`, `$session_name` | Audit trail attribution | History entries will be incomplete |
@@ -46,13 +46,12 @@ This plugin was developed against ITFlow 0.6+. It depends on these ITFlow core f
 ### What Could Break After an ITFlow Update
 
 1. **Function signature changes**: If ITFlow renames or changes the parameters of `enforceUserPermission()`, `validateCSRFToken()`, or `addToMailQueue()`, the plugin will break. Run `./verify.sh` after every update.
-2. **Include path restructuring**: If `includes/inc_all.php` or `config.php` move, all plugin pages will fail to load.
+2. **Custom module restructuring**: If ITFlow changes how `agent/custom/` works (e.g., removes `inc_all_custom.php` or `post.php`), the plugin pages will fail to load.
 3. **Database schema changes**: The plugin JOINs against ITFlow core tables (`clients`, `contacts`, `companies`, `notifications`). If these table names or column names change, queries will fail.
 4. **AdminLTE/Bootstrap version upgrades**: The plugin uses Bootstrap 4 classes and AdminLTE markup. A major UI framework upgrade would break the layout.
 5. **TCPDF removal or relocation**: If `plugins/TCPDF/` is removed or moved, PDF export will break.
 6. **TinyMCE removal or relocation**: If `plugins/tinymce/` is removed or moved, the rich text editor in document creation will not load.
-7. **`custom_links` table changes**: If ITFlow changes how sidebar custom links work, the navigation entry may disappear.
-8. **`glob()` auto-discovery removal**: If ITFlow stops using `glob("post/*.php")` in `agent/post.php`, the POST handler will not load. The installer detects this and falls back to manual registration.
+7. **Custom sidebar changes**: If ITFlow changes `custom_side_nav.php` format, the injected navigation may disappear. Re-run `install.sh` to fix.
 
 ### After Every ITFlow Update
 
@@ -84,9 +83,9 @@ The installer will:
 - Verify the target directory is a real ITFlow installation
 - Check for required PHP extensions and ITFlow core functions
 - Back up any files it overwrites (to `.signable_backup_YYYYMMDD_HHMMSS/`)
-- Copy all plugin files into the correct locations
+- Copy all plugin files into `agent/custom/` and other directories
+- Inject sidebar navigation into `custom_side_nav.php`
 - Create the database tables (if MySQL CLI is available)
-- Add a "Signable Documents" sidebar link via the `custom_links` table
 - Create the uploads directory with proper permissions
 - Run a full verification check
 
@@ -95,6 +94,7 @@ The installer will:
 ### Prerequisites
 
 - A working ITFlow installation (tested with ITFlow 0.6+)
+- The `agent/custom/` directory (present in ITFlow 0.6+)
 - MariaDB/MySQL database access
 - PHP with `finfo` extension (usually enabled by default)
 
@@ -115,19 +115,31 @@ Or copy the contents of `setup/db_schema.sql` into phpMyAdmin.
 ```bash
 ITFLOW=/path/to/your/itflow
 
+# Shared functions
 cp includes/functions_signable.php            $ITFLOW/includes/
-cp agent/signable_documents.php               $ITFLOW/agent/
-cp agent/signable_document.php                $ITFLOW/agent/
-cp agent/ajax_signable.php                    $ITFLOW/agent/
 
-mkdir -p $ITFLOW/agent/modals/signable_document
-cp agent/modals/signable_document/*.php       $ITFLOW/agent/modals/signable_document/
+# Agent pages (into agent/custom/)
+cp agent/custom/signable_documents.php        $ITFLOW/agent/custom/
+cp agent/custom/signable_document.php         $ITFLOW/agent/custom/
+cp agent/custom/ajax_signable.php             $ITFLOW/agent/custom/
 
-cp agent/post/signable_document.php           $ITFLOW/agent/post/
-cp agent/post/signable_document_model.php     $ITFLOW/agent/post/
+# Modals
+mkdir -p $ITFLOW/agent/custom/modals/signable_document
+cp agent/custom/modals/signable_document/*.php $ITFLOW/agent/custom/modals/signable_document/
 
+# POST handlers (auto-discovered by agent/custom/post.php)
+mkdir -p $ITFLOW/agent/custom/post
+cp agent/custom/post/signable_document.php     $ITFLOW/agent/custom/post/
+cp agent/custom/post/signable_document_model.php $ITFLOW/agent/custom/post/
+
+# Sidebar nav snippet
+cp agent/custom/includes/signable_side_nav_snippet.php $ITFLOW/agent/custom/includes/
+
+# Guest pages
 cp guest/guest_sign_document.php              $ITFLOW/guest/
 cp guest/guest_download_signed_pdf.php        $ITFLOW/guest/
+
+# JavaScript
 cp js/signature_pad.js                        $ITFLOW/js/
 ```
 
@@ -136,43 +148,24 @@ cp js/signature_pad.js                        $ITFLOW/js/
 ```bash
 mkdir -p $ITFLOW/uploads/signable_documents
 chown www-data:www-data $ITFLOW/uploads/signable_documents
-chmod 770 $ITFLOW/uploads/signable_documents
+chmod 750 $ITFLOW/uploads/signable_documents
 ```
 
 Adjust `www-data` to match your web server user (e.g., `apache`, `nginx`).
 
-#### Step 4: Verify POST Handler Auto-Discovery
+#### Step 4: Add Sidebar Navigation
 
-ITFlow's `agent/post.php` uses `glob("post/*.php")` to auto-discover POST handlers. Since the plugin places `signable_document.php` in `agent/post/`, it is loaded automatically. **No editing of `post.php` is needed.**
+Edit `$ITFLOW/agent/custom/includes/custom_side_nav.php` and add the contents of `agent/custom/includes/signable_side_nav_snippet.php` before the closing `</ul>` tag. This adds the "Document Signing" section to the custom module sidebar.
 
-To verify, check that `agent/post.php` contains a line like:
-```php
-foreach (glob("post/*.php") as $user_module) {
-```
-
-If your ITFlow version does NOT use glob (very old versions), add this line to `agent/post.php`:
-```php
-require_once("post/signable_document.php");
-```
-
-#### Step 5: Add Sidebar Navigation
-
-The database schema includes an INSERT into ITFlow's `custom_links` table that adds the sidebar entry. If you ran the schema in Step 1, this is already done.
-
-If the link doesn't appear, add it manually via SQL:
-```sql
-INSERT INTO custom_links (custom_link_name, custom_link_url, custom_link_icon, custom_link_target)
-VALUES ('Signable Documents', '/agent/signable_documents.php', 'fas fa-file-signature', '_self');
-```
-
-#### Step 6: Test the Installation
+#### Step 5: Test the Installation
 
 1. Log in to ITFlow as an agent with sales module write access.
-2. Look for "Signable Documents" in the sidebar.
-3. Click "New Document" to create a test document.
-4. Use "Send for Signature" to email yourself the signing link.
-5. Open the link and verify the signing page loads correctly.
-6. Sign the document and confirm the signature appears in the agent detail view.
+2. Navigate to the **Custom** section in ITFlow's sidebar.
+3. Look for **Document Signing** in the custom sidebar.
+4. Click "All Documents" and then "New Document" to create a test document.
+5. Use "Send for Signature" to email yourself the signing link.
+6. Open the link and verify the signing page loads correctly.
+7. Sign the document and confirm the signature appears in the agent detail view.
 
 ## Uninstall
 
@@ -182,7 +175,7 @@ VALUES ('Signable Documents', '/agent/signable_documents.php', 'fas fa-file-sign
 
 The uninstaller will auto-detect your ITFlow installation and ask you to confirm. You can also pass a path directly: `./uninstall.sh /your/itflow/path`
 
-This removes all plugin files and the sidebar link. Database tables are preserved by default (to protect signing data). To also drop tables:
+This removes all plugin files and sidebar navigation. Database tables are preserved by default (to protect signing data). To also drop tables:
 
 ```bash
 ./uninstall.sh --drop-tables
@@ -192,7 +185,7 @@ This removes all plugin files and the sidebar link. Database tables are preserve
 
 ### Architecture
 
-This plugin follows ITFlow's existing procedural, file-based architecture. There is no separate framework -- it uses the same patterns as ITFlow core: PHP files for pages, Bootstrap/AdminLTE modals for forms, a centralized POST handler for actions, and raw `mysqli` for database access.
+This plugin uses ITFlow's `agent/custom/` directory, the recommended location for custom modules. It follows ITFlow's existing procedural, file-based architecture: PHP files for pages, Bootstrap/AdminLTE modals for forms, a centralized POST handler for actions, and raw `mysqli` for database access.
 
 ### Document Lifecycle
 
@@ -200,26 +193,28 @@ This plugin follows ITFlow's existing procedural, file-based architecture. There
 2. **Agent sends the document** using the "Send for Signature" action. This emails the client a link to the guest signing page and updates the status to "Sent".
 3. **Client opens the link** (`/guest/guest_sign_document.php?signable_document_id=X&url_key=Y`). The status updates to "Viewed" and the agent receives a notification.
 4. **Client signs the document** by entering their name, email, drawing their signature on a canvas, and checking the consent box. The signature (as a PNG data URL), signer identity, IP address, user agent, and an SHA-256 integrity hash are all recorded.
-5. **Client may alternatively decline** the document, which sets the status to "Declined" and notifies agents.
-6. **Agent can export a PDF** at any time that includes the document content and any collected signatures.
+5. **Signed copy is emailed** to the signer automatically, with a link to download the PDF (including Certificate of Completion).
+6. **Client may alternatively decline** the document, which sets the status to "Declined" and notifies agents.
+7. **Agent can export a PDF** at any time that includes the document content, embedded signatures, and a Certificate of Completion page.
 
 ### Key Components
 
 | Component | File | Purpose |
 |-----------|------|---------|
-| List page | `agent/signable_documents.php` | Filterable, paginated list of all signable documents |
-| Detail page | `agent/signable_document.php` | View document content, signatures, history, and actions |
-| Add modal | `agent/modals/signable_document/signable_document_add.php` | Create new document (TinyMCE editor, client/contact select, PDF upload) |
-| Edit modal | `agent/modals/signable_document/signable_document_edit.php` | Edit draft documents |
-| Send modal | `agent/modals/signable_document/signable_document_send.php` | Email document link with customizable subject/body |
-| POST handler | `agent/post/signable_document.php` | All server-side actions: create, edit, send, archive, PDF export |
-| Input model | `agent/post/signable_document_model.php` | Input sanitization and validation |
-| AJAX handler | `agent/ajax_signable.php` | JSON API for populating edit/send modals |
+| List page | `agent/custom/signable_documents.php` | Filterable, paginated list of all signable documents |
+| Detail page | `agent/custom/signable_document.php` | View document content, signatures, history, and actions |
+| Add modal | `agent/custom/modals/signable_document/signable_document_add.php` | Create new document (TinyMCE editor, client/contact select, PDF upload) |
+| Edit modal | `agent/custom/modals/signable_document/signable_document_edit.php` | Edit draft documents |
+| Send modal | `agent/custom/modals/signable_document/signable_document_send.php` | Email document link with customizable subject/body |
+| POST handler | `agent/custom/post/signable_document.php` | All server-side actions: create, edit, send, archive, PDF export |
+| Input model | `agent/custom/post/signable_document_model.php` | Input sanitization and validation |
+| AJAX handler | `agent/custom/ajax_signable.php` | JSON API for populating edit/send modals |
+| Sidebar nav | `agent/custom/includes/signable_side_nav_snippet.php` | Custom sidebar navigation items |
 | Guest page | `guest/guest_sign_document.php` | Public signing page (no auth, validated by URL key) |
 | Guest PDF download | `guest/guest_download_signed_pdf.php` | Download signed PDF with Certificate of Completion |
-| Shared functions | `includes/functions_signable.php` | Status badges, history logging, hash generation, URL key generation |
+| Shared functions | `includes/functions_signable.php` | Status badges, history logging, hash generation, URL key generation, PDF generation |
 | Signature pad | `js/signature_pad.js` | Lightweight canvas signature capture (mouse + touch, velocity-based line width) |
-| DB schema | `setup/db_schema.sql` | Three tables + sidebar link |
+| DB schema | `setup/db_schema.sql` | Three tables (documents, signatures, history) |
 
 ### Database Tables
 
@@ -243,32 +238,34 @@ This plugin follows ITFlow's existing procedural, file-based architecture. There
 
 ```
 ITFlow_Doc_Sign/
-├── README.md                                   # This file
-├── install.sh                                  # Automated installer
-├── uninstall.sh                                # Automated uninstaller
-├── verify.sh                                   # Post-upgrade verification
+├── README.md                                            # This file
+├── install.sh                                           # Automated installer
+├── uninstall.sh                                         # Automated uninstaller
+├── verify.sh                                            # Post-upgrade verification
 ├── setup/
-│   └── db_schema.sql                           # Database migration (3 tables + sidebar link)
+│   └── db_schema.sql                                    # Database migration (3 tables)
 ├── includes/
-│   └── functions_signable.php                  # Shared PHP functions
-├── agent/
-│   ├── signable_documents.php                  # Document list page
-│   ├── signable_document.php                   # Document detail page
-│   ├── ajax_signable.php                       # AJAX endpoint for modals
+│   └── functions_signable.php                           # Shared PHP functions
+├── agent/custom/
+│   ├── signable_documents.php                           # Document list page
+│   ├── signable_document.php                            # Document detail page
+│   ├── ajax_signable.php                                # AJAX endpoint for modals
+│   ├── includes/
+│   │   └── signable_side_nav_snippet.php                # Sidebar navigation snippet
 │   ├── post/
-│   │   ├── signable_document.php               # POST handler (CRUD, send, archive, PDF)
-│   │   └── signable_document_model.php         # Input sanitization
+│   │   ├── signable_document.php                        # POST handler (CRUD, send, archive, PDF)
+│   │   └── signable_document_model.php                  # Input sanitization
 │   └── modals/signable_document/
-│       ├── signable_document_add.php           # Create document modal
-│       ├── signable_document_edit.php          # Edit document modal
-│       └── signable_document_send.php          # Send for signature modal
+│       ├── signable_document_add.php                    # Create document modal
+│       ├── signable_document_edit.php                   # Edit document modal
+│       └── signable_document_send.php                   # Send for signature modal
 ├── guest/
-│   ├── guest_sign_document.php                 # Public guest signing page
-│   └── guest_download_signed_pdf.php           # Guest PDF download (signed copy)
+│   ├── guest_sign_document.php                          # Public guest signing page
+│   └── guest_download_signed_pdf.php                    # Guest PDF download (signed copy)
 ├── js/
-│   └── signature_pad.js                        # Canvas signature capture library
+│   └── signature_pad.js                                 # Canvas signature capture library
 └── uploads/
-    └── signable_documents/                     # PDF upload storage (created during install)
+    └── signable_documents/                              # PDF upload storage (created during install)
 ```
 
 ## Custom Action Hooks

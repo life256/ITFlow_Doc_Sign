@@ -4,10 +4,10 @@
  * ITFlow Document Signing Plugin - POST Handler
  *
  * Handles all CRUD and action operations for signable documents.
- * This file is included by the main agent/post.php handler.
+ * This file is included by agent/custom/post.php (working directory is agent/custom/).
  */
 
-require_once("../includes/functions_signable.php");
+require_once("../../includes/functions_signable.php");
 
 // ============================================================
 // CREATE - Add new signable document

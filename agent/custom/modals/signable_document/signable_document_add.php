@@ -109,7 +109,7 @@ $(document).ready(function() {
         var contactSelect = $('#addSignableContactSelect');
         contactSelect.html('<option value="0">Any Contact</option>');
         if (clientId) {
-            $.get('ajax.php?get_client_contacts&client_id=' + clientId, function(data) {
+            $.get('../ajax.php?get_client_contacts&client_id=' + clientId, function(data) {
                 var response = JSON.parse(data);
                 if (response.contacts) {
                     response.contacts.forEach(function(contact) {

@@ -9,10 +9,10 @@
 // Buffer output to prevent stray whitespace/warnings from breaking JSON
 ob_start();
 
-require_once("../config.php");
-require_once("../functions.php");
-require_once("../includes/check_login.php");
-require_once("../includes/functions_signable.php");
+require_once("../../config.php");
+require_once("../../functions.php");
+require_once("../../includes/check_login.php");
+require_once("../../includes/functions_signable.php");
 
 // Discard any output from includes, then set JSON header
 ob_end_clean();

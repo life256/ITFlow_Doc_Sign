@@ -67,15 +67,17 @@ echo -e "${BOLD}Files:${NC}"
 
 for f in \
     "includes/functions_signable.php" \
-    "agent/signable_documents.php" \
-    "agent/signable_document.php" \
-    "agent/ajax_signable.php" \
-    "agent/post/signable_document.php" \
-    "agent/post/signable_document_model.php" \
-    "agent/modals/signable_document/signable_document_add.php" \
-    "agent/modals/signable_document/signable_document_edit.php" \
-    "agent/modals/signable_document/signable_document_send.php" \
+    "agent/custom/signable_documents.php" \
+    "agent/custom/signable_document.php" \
+    "agent/custom/ajax_signable.php" \
+    "agent/custom/post/signable_document.php" \
+    "agent/custom/post/signable_document_model.php" \
+    "agent/custom/modals/signable_document/signable_document_add.php" \
+    "agent/custom/modals/signable_document/signable_document_edit.php" \
+    "agent/custom/modals/signable_document/signable_document_send.php" \
+    "agent/custom/includes/signable_side_nav_snippet.php" \
     "guest/guest_sign_document.php" \
+    "guest/guest_download_signed_pdf.php" \
     "js/signature_pad.js"
 do
     [ -f "$ITFLOW/$f" ] && ok "$f" || fail "$f MISSING"
@@ -86,14 +88,27 @@ echo ""
 # ── Integration checks ───────────────────────────────────────────
 echo -e "${BOLD}Integration:${NC}"
 
-# POST handler auto-discovery
-if grep -q 'glob.*post/.*\.php' "$ITFLOW/agent/post.php" 2>/dev/null; then
-    ok "POST handler auto-discovered via glob()"
-elif grep -qF 'require_once("post/signable_document.php")' "$ITFLOW/agent/post.php" 2>/dev/null; then
-    ok "POST handler manually registered in agent/post.php"
+# Custom module post handler auto-discovery
+if [ -f "$ITFLOW/agent/custom/post.php" ] && grep -q 'glob.*post/.*\.php' "$ITFLOW/agent/custom/post.php" 2>/dev/null; then
+    ok "POST handler auto-discovered via agent/custom/post.php glob()"
 else
-    fail "POST handler NOT loadable (no glob and no manual registration)"
-    echo -e "    ${CYAN}Fix: Re-run install.sh${NC}"
+    fail "agent/custom/post.php not found or does not use glob()"
+    echo -e "    ${CYAN}Fix: Ensure agent/custom/post.php exists and uses glob() pattern${NC}"
+fi
+
+# Custom sidebar navigation
+SIDE_NAV="$ITFLOW/agent/custom/includes/custom_side_nav.php"
+if [ -f "$SIDE_NAV" ] && grep -qF "<!-- ITFlow Document Signing Plugin -->" "$SIDE_NAV"; then
+    ok "Sidebar navigation injected in custom_side_nav.php"
+else
+    warn_ "Sidebar navigation not found in custom_side_nav.php (re-run install.sh)"
+fi
+
+# Custom module bootstrap
+if [ -f "$ITFLOW/agent/custom/includes/inc_all_custom.php" ]; then
+    ok "inc_all_custom.php found (custom module bootstrap)"
+else
+    fail "inc_all_custom.php NOT FOUND (custom module pages depend on this)"
 fi
 
 # Uploads directory
@@ -131,13 +146,6 @@ if grep -rql "function addToMailQueue" "$ITFLOW/includes/" "$ITFLOW/functions.ph
     ok "addToMailQueue() - Email delivery"
 else
     warn_ "addToMailQueue() not found (email sending may not work)"
-fi
-
-# Check inc_all.php exists
-if [ -f "$ITFLOW/includes/inc_all.php" ] || [ -f "$ITFLOW/agent/includes/inc_all.php" ]; then
-    ok "inc_all.php found"
-else
-    fail "inc_all.php NOT FOUND (all agent pages depend on this)"
 fi
 
 # Check config.php
