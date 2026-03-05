@@ -393,8 +393,12 @@ if [ -f "$SIDE_NAV" ]; then
         ok "Sidebar navigation injected into custom_side_nav.php"
     fi
 else
-    warn "custom_side_nav.php not found. Creating it with plugin navigation."
-    warn "If your ITFlow version has a different custom sidebar mechanism, you may need to adjust manually."
+    info "custom_side_nav.php not found — creating it with plugin navigation."
+    SNIPPET=$(cat "$SCRIPT_DIR/agent/custom/includes/signable_side_nav_snippet.php")
+    cat > "$SIDE_NAV" <<NAVEOF
+$SNIPPET
+NAVEOF
+    ok "Created custom_side_nav.php with plugin navigation."
 fi
 
 echo ""
