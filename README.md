@@ -45,7 +45,7 @@ This plugin was developed against ITFlow 0.6+. It depends on these ITFlow core f
 
 ### What Could Break After an ITFlow Update
 
-1. **Function signature changes**: If ITFlow renames or changes the parameters of `enforceUserPermission()`, `validateCSRFToken()`, or `sendSingleEmail()`, the plugin will break. Run `./verify.sh` after every update.
+1. **Function signature changes**: If ITFlow renames or changes the parameters of `enforceUserPermission()`, `validateCSRFToken()`, or `addToMailQueue()`, the plugin will break. Run `./verify.sh` after every update.
 2. **Include path restructuring**: If `includes/inc_all.php` or `config.php` move, all plugin pages will fail to load.
 3. **Database schema changes**: The plugin JOINs against ITFlow core tables (`clients`, `contacts`, `companies`, `notifications`). If these table names or column names change, queries will fail.
 4. **AdminLTE/Bootstrap version upgrades**: The plugin uses Bootstrap 4 classes and AdminLTE markup. A major UI framework upgrade would break the layout.
@@ -127,6 +127,7 @@ cp agent/post/signable_document.php           $ITFLOW/agent/post/
 cp agent/post/signable_document_model.php     $ITFLOW/agent/post/
 
 cp guest/guest_sign_document.php              $ITFLOW/guest/
+cp guest/guest_download_signed_pdf.php        $ITFLOW/guest/
 cp js/signature_pad.js                        $ITFLOW/js/
 ```
 
@@ -215,6 +216,7 @@ This plugin follows ITFlow's existing procedural, file-based architecture. There
 | Input model | `agent/post/signable_document_model.php` | Input sanitization and validation |
 | AJAX handler | `agent/ajax_signable.php` | JSON API for populating edit/send modals |
 | Guest page | `guest/guest_sign_document.php` | Public signing page (no auth, validated by URL key) |
+| Guest PDF download | `guest/guest_download_signed_pdf.php` | Download signed PDF with Certificate of Completion |
 | Shared functions | `includes/functions_signable.php` | Status badges, history logging, hash generation, URL key generation |
 | Signature pad | `js/signature_pad.js` | Lightweight canvas signature capture (mouse + touch, velocity-based line width) |
 | DB schema | `setup/db_schema.sql` | Three tables + sidebar link |
@@ -261,7 +263,8 @@ ITFlow_Doc_Sign/
 │       ├── signable_document_edit.php          # Edit document modal
 │       └── signable_document_send.php          # Send for signature modal
 ├── guest/
-│   └── guest_sign_document.php                 # Public guest signing page
+│   ├── guest_sign_document.php                 # Public guest signing page
+│   └── guest_download_signed_pdf.php           # Guest PDF download (signed copy)
 ├── js/
 │   └── signature_pad.js                        # Canvas signature capture library
 └── uploads/
