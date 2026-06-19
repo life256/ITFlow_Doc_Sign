@@ -42,13 +42,21 @@ function documensoLoadConfig() {
     return [
         'base_url'              => rtrim($documenso_base_url ?? '', '/'),
         'api_key'               => $documenso_api_key ?? '',
-        'template_envelope_id'  => $documenso_template_envelope_id ?? '',
-        'field_labels'          => $documenso_field_labels ?? [],
-        'recipients'            => $documenso_recipients ?? [],
         'default_approver_name' => $documenso_default_approver_name ?? '',
         'default_approver_email'=> $documenso_default_approver_email ?? '',
         'signed_files_folder'   => $documenso_signed_files_folder ?? 'Signed Documents',
+        'templates'             => $documenso_templates ?? [],
+        'default_template_key'  => $documenso_default_template_key ?? '',
     ];
+}
+
+/**
+ * Fetch a single template config entry by key. Returns the template array,
+ * or null if the key isn't defined.
+ */
+function documensoGetTemplate($cfg, $key) {
+    $templates = $cfg['templates'] ?? [];
+    return $templates[$key] ?? null;
 }
 
 // ====================================================================
@@ -140,16 +148,26 @@ function documensoApiPostEnvelopeUse($cfg, $payload) {
  * Read the template and resolve our four prefill field LABELS to numeric ids.
  * Returns [labelKey => numericFieldId] or false on failure.
  */
-function documensoResolveFieldIds($cfg) {
-    // Template numeric id is 1 in our instance, but we read by the configured
-    // template envelope where possible. The /template/{id} GET takes the
-    // numeric id; we derive it from the envelope by listing, falling back to 1.
-    // Simplest reliable path proven in testing: GET /template/1.
-    list($code, $body) = documensoApiGet($cfg, '/template/1');
+function documensoResolveFieldIds($cfg, $template) {
+    // Resolve a template's field LABELS to numeric field ids by reading the
+    // template from Documenso. Targeting by label (not id) keeps us resilient
+    // to template edits that renumber the underlying field ids.
+    //
+    // Templates with no prefill (field_labels empty) resolve to an empty map.
+    $wanted = $template['field_labels'] ?? [];
+    if (empty($wanted)) {
+        return []; // no prefill fields for this template — valid, not an error
+    }
+
+    // The /template/{numericId} GET takes the numeric template id, which is
+    // stored in the template's config entry ('template_numeric_id'). Falls
+    // back to 1 (the single-template case proven in testing) if unset.
+    $numericTemplateId = intval($template['template_numeric_id'] ?? 1);
+    list($code, $body) = documensoApiGet($cfg, '/template/' . $numericTemplateId);
     if ($code !== 200 || !is_array($body)) {
         return false;
     }
-    $wanted = $cfg['field_labels']; // e.g. ['business_name' => 'Business Name', ...]
+
     $byLabel = [];
     foreach (($body['fields'] ?? []) as $f) {
         $label = $f['fieldMeta']['label'] ?? null;
@@ -176,25 +194,37 @@ function documensoResolveFieldIds($cfg) {
  * @param array $signer    ['name','email'] for the client signer
  * @param array $approver  ['name','email'] for the final approver
  */
-function documensoCreateEnvelope($cfg, $fieldIds, $values, $signer, $approver) {
-    $r = $cfg['recipients'];
+function documensoCreateEnvelope($cfg, $template, $fieldIds, $values, $signer, $approver) {
+    $r = $template['recipients'];
+
+    // Build prefillFields generically from whatever fields this template
+    // resolved. A 'none'-profile template has empty $fieldIds, so no prefill
+    // is sent. Field type defaults to 'text'; override per-field via the
+    // template's optional 'field_types' map (e.g. monthly_rate => 'number').
+    $fieldTypes = $template['field_types'] ?? [];
+    $prefillFields = [];
+    foreach ($fieldIds as $key => $id) {
+        if (!array_key_exists($key, $values)) { continue; }
+        $prefillFields[] = [
+            'id'    => $id,
+            'type'  => $fieldTypes[$key] ?? 'text',
+            'value' => $values[$key],
+        ];
+    }
 
     $payload = [
-        'envelopeId' => $cfg['template_envelope_id'],
+        'envelopeId' => $template['template_envelope_id'],
         'recipients' => [
-            // Provider (you) keeps the template's own email — not overridden here.
+            // Provider (you) keeps the template's own email — not overridden.
             ['id' => $r['client_signer_id'], 'email' => $signer['email'],   'name' => $signer['name']],
             ['id' => $r['approver_id'],      'email' => $approver['email'], 'name' => $approver['name']],
         ],
         'distributeDocument' => false,
-        'prefillFields' => [
-            ['id' => $fieldIds['business_name'],    'type' => 'text',   'value' => $values['business_name']],
-            ['id' => $fieldIds['business_address'], 'type' => 'text',   'value' => $values['business_address']],
-            ['id' => $fieldIds['monthly_rate'],     'type' => 'number', 'value' => $values['monthly_rate']],
-            ['id' => $fieldIds['effective_date'],   'type' => 'text',   'value' => $values['effective_date']],
-        ],
         'override' => ['distributionMethod' => 'NONE'],
     ];
+    if (!empty($prefillFields)) {
+        $payload['prefillFields'] = $prefillFields;
+    }
 
     return documensoApiPostEnvelopeUse($cfg, $payload);
 }

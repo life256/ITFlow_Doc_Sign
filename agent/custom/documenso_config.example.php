@@ -3,48 +3,85 @@
 /**
  * ITFlow Document Signing Plugin (Documenso edition) - Configuration
  *
- * COPY this file to `documenso_config.php` in the same directory and fill in
- * your real values. `documenso_config.php` is git-ignored so your API key
- * never lands in the repo.
+ * Copy this file to documenso_config.php and fill in real values.
+ * documenso_config.php is git-ignored and must NEVER be committed.
  *
- * On the server, lock it down so only the web server user can read it:
- *     chmod 640 documenso_config.php
- *     chown www-data:www-data documenso_config.php   # adjust user as needed
+ *   cp documenso_config.example.php documenso_config.php
+ *   chmod 640 documenso_config.php && chown root:www-data documenso_config.php
+ *
+ * Document types are defined in $documenso_templates below. Adding a
+ * no-prefill template is pure config: copy an entry, set its key/label/
+ * template_envelope_id, set prefill_profile => 'none', empty field_labels,
+ * and fill the three recipient placeholder ids from that Documenso template.
  */
 
-// Base URL of your Documenso API (no trailing slash)
+// --- Documenso connection ---
 $documenso_base_url = 'https://sign.example.com/api/v2';
+$documenso_api_key  = 'api_xxxxxxxxxxxxxxxx';
 
-// Documenso API token (the value you pass in the Authorization header)
-$documenso_api_key = 'api_xxxxxxxxxxxxxxxxx';
+// --- Default approver (used when no per-send override is given) ---
+$documenso_default_approver_name  = 'Your Name';
+$documenso_default_approver_email = 'you@example.com';
 
-// The template envelope this plugin sends. Get it from:
-//   GET /api/v2/template/{id}  ->  "envelopeId"
-$documenso_template_envelope_id = 'envelope_xxxxxxxxxxxxxxxx';
-
-// Map of MSA prefill field LABELS as set in the Documenso template.
-// The plugin resolves these labels to numeric field ids at runtime by
-// reading the template, so field-id changes on template edits won't break it.
-$documenso_field_labels = [
-    'business_name'    => 'Business Name',
-    'business_address' => 'Business Address',
-    'monthly_rate'     => 'Monthly Rate',
-    'effective_date'   => 'Effective Date',
-];
-
-// Documenso template recipient PLACEHOLDER ids (from the template structure).
-// These are the slots real people get mapped onto at send time.
-$documenso_recipients = [
-    'provider_id'      => 2,   // You (the provider) - signs first
-    'client_signer_id' => 29,  // Client authorized representative - signs second
-    'approver_id'      => 30,  // Final approver - signs last (defaults to provider)
-];
-
-// Default approver (used when no specific approver is supplied at send time).
-// Per the workflow: you fill+sign, client signs, then back to you to approve.
-$documenso_default_approver_name  = 'Provider Name';
-$documenso_default_approver_email = 'provider@example.com';
-
-// The ITFlow template document type these MSAs are filed under, and the
-// Files-section folder name where signed PDFs get stored per client.
+// --- Where signed PDFs are filed inside the client's ITFlow Files ---
 $documenso_signed_files_folder = 'Signed Documents';
+
+// --- Default template pre-selected in the Send dropdown ---
+$documenso_default_template_key = 'msa';
+
+/**
+ * --- Document templates (selectable in the Send dropdown) ---
+ *
+ * prefill_profile: one of
+ *   'none'         - no field prefill (just maps the client signer)
+ *   'client_basic' - prefills business name + address
+ *   'msa_full'     - business name + address + monthly rate + effective date
+ *                    (rate/date pulled from the client's latest invoice;
+ *                     address from the client's primary location)
+ *
+ * field_labels: maps each profile field to the Documenso field LABEL on
+ *   that template (we target by label so template edits that renumber the
+ *   underlying field ids don't break anything). Empty for 'none'.
+ *
+ * recipients: standard provider -> client -> approver flow. The ids are the
+ *   placeholder recipient ids on that specific Documenso template.
+ */
+$documenso_templates = [
+
+    'msa' => [
+        'key'                  => 'msa',
+        'label'                => 'Master Service Agreement',
+        'template_envelope_id' => 'envelope_xxxxxxxxxxxxxxxx',
+        'template_numeric_id'  => 1,   // the template's numeric id (GET /template/{n})
+        'prefill_profile'      => 'msa_full',
+        'field_labels'         => [
+            'business_name'    => 'Business Name',
+            'business_address' => 'Business Address',
+            'monthly_rate'     => 'Monthly Rate',
+            'effective_date'   => 'Effective Date',
+        ],
+        'field_types'          => [
+            'monthly_rate'     => 'number',  // others default to 'text'
+        ],
+        'recipients' => [
+            'provider_id'      => 2,   // you (signs first)
+            'client_signer_id' => 29,  // client primary contact (signs second)
+            'approver_id'      => 30,  // you again (final approver)
+        ],
+    ],
+
+    // --- Example: a simple no-prefill document. Uncomment + edit to enable. ---
+    // 'nda' => [
+    //     'key'                  => 'nda',
+    //     'label'                => 'Non-Disclosure Agreement',
+    //     'template_envelope_id' => 'envelope_REPLACE_ME',
+    //     'prefill_profile'      => 'none',
+    //     'field_labels'         => [],
+    //     'recipients' => [
+    //         'provider_id'      => 2,
+    //         'client_signer_id' => 5,
+    //         'approver_id'      => 6,
+    //     ],
+    // ],
+
+];

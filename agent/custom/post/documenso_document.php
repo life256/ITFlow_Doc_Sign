@@ -12,6 +12,63 @@
 
 require_once("../../includes/functions_documenso.php");
 
+/**
+ * Gather prefill values for a given profile from ITFlow data (direct DB).
+ * Returns [values_array, error_string]. On success error is null. On failure
+ * values is null and error is a user-facing message.
+ *
+ * Profiles:
+ *   'none'         -> no prefill ([] , null)
+ *   'client_basic' -> business_name + business_address
+ *   'msa_full'     -> business_name + business_address + monthly_rate + effective_date
+ */
+function documensoGatherPrefill($mysqli, $profile, $client_id, $business_name) {
+    if ($profile === 'none') {
+        return [[], null];
+    }
+
+    // Both client_basic and msa_full need the primary location (address).
+    $loc = mysqli_fetch_assoc(mysqli_query($mysqli,
+        "SELECT location_address, location_city, location_state, location_zip
+         FROM locations
+         WHERE location_client_id = " . intval($client_id) . " AND location_primary = 1
+         LIMIT 1"));
+    if (!$loc || empty($loc['location_address'])) {
+        return [null, "Client has no primary location/address set. Add one before sending this document."];
+    }
+    $business_address = trim($loc['location_address'] . ', ' . $loc['location_city'] . ', ' . $loc['location_state'] . ' ' . $loc['location_zip']);
+
+    $values = [
+        'business_name'    => $business_name,
+        'business_address' => $business_address,
+    ];
+
+    if ($profile === 'client_basic') {
+        return [$values, null];
+    }
+
+    if ($profile === 'msa_full') {
+        // Most recent non-archived invoice -> rate + effective date.
+        $inv = mysqli_fetch_assoc(mysqli_query($mysqli,
+            "SELECT invoice_amount, invoice_due
+             FROM invoices
+             WHERE invoice_client_id = " . intval($client_id) . " AND invoice_archived_at IS NULL
+             ORDER BY invoice_id DESC LIMIT 1"));
+        if (!$inv) {
+            return [null, "Client has no invoice. Create the placeholder invoice (amount + due date) before sending this document."];
+        }
+        $effective_date = $inv['invoice_due'];
+        $ts = strtotime($inv['invoice_due']);
+        if ($ts !== false) { $effective_date = date('F j, Y', $ts); }
+        $values['monthly_rate']   = $inv['invoice_amount'];
+        $values['effective_date'] = $effective_date;
+        return [$values, null];
+    }
+
+    // Unknown profile
+    return [null, "Unknown prefill profile: " . htmlspecialchars($profile)];
+}
+
 // ============================================================
 // CREATE MSA - gather client data, create + distribute envelope
 // ============================================================
@@ -21,12 +78,13 @@ if (isset($_POST['create_documenso_msa'])) {
     enforceUserPermission('module_sales', 2);
 
     $client_id = intval($_POST['client_id'] ?? 0);
+    $template_key = trim($_POST['template_key'] ?? '');
     $approver_name_in  = trim($_POST['approver_name']  ?? '');
     $approver_email_in = trim($_POST['approver_email'] ?? '');
 
     if ($client_id <= 0) {
         $_SESSION['alert_type'] = "error";
-        $_SESSION['alert_message'] = "A client is required to create an MSA.";
+        $_SESSION['alert_message'] = "A client is required to create a document.";
         header("Location: documenso_documents.php");
         exit();
     }
@@ -35,6 +93,18 @@ if (isset($_POST['create_documenso_msa'])) {
     if (!$cfg) {
         $_SESSION['alert_type'] = "error";
         $_SESSION['alert_message'] = "Documenso config not found. Copy documenso_config.example.php to documenso_config.php.";
+        header("Location: documenso_documents.php");
+        exit();
+    }
+
+    // --- Resolve which template to use ---
+    if ($template_key === '') {
+        $template_key = $cfg['default_template_key'];
+    }
+    $template = documensoGetTemplate($cfg, $template_key);
+    if (!$template) {
+        $_SESSION['alert_type'] = "error";
+        $_SESSION['alert_message'] = "Unknown document template selected.";
         header("Location: documenso_documents.php");
         exit();
     }
@@ -50,39 +120,7 @@ if (isset($_POST['create_documenso_msa'])) {
     }
     $business_name = $client['client_name'];
 
-    // --- Primary location (address) ---
-    $loc = mysqli_fetch_assoc(mysqli_query($mysqli,
-        "SELECT location_address, location_city, location_state, location_zip
-         FROM locations
-         WHERE location_client_id = $client_id AND location_primary = 1
-         LIMIT 1"));
-    if (!$loc || empty($loc['location_address'])) {
-        $_SESSION['alert_type'] = "error";
-        $_SESSION['alert_message'] = "Client has no primary location/address set. Add one before sending the MSA.";
-        header("Location: documenso_documents.php");
-        exit();
-    }
-    $business_address = trim($loc['location_address'] . ', ' . $loc['location_city'] . ', ' . $loc['location_state'] . ' ' . $loc['location_zip']);
-
-    // --- Most recent non-archived invoice (rate + effective date) ---
-    $inv = mysqli_fetch_assoc(mysqli_query($mysqli,
-        "SELECT invoice_amount, invoice_due
-         FROM invoices
-         WHERE invoice_client_id = $client_id AND invoice_archived_at IS NULL
-         ORDER BY invoice_id DESC LIMIT 1"));
-    if (!$inv) {
-        $_SESSION['alert_type'] = "error";
-        $_SESSION['alert_message'] = "Client has no invoice. Create the placeholder invoice (amount + due date) before sending the MSA.";
-        header("Location: documenso_documents.php");
-        exit();
-    }
-    $monthly_rate = $inv['invoice_amount'];
-    // Effective date = invoice due date, formatted long (e.g. February 28, 2025)
-    $effective_date = $inv['invoice_due'];
-    $ts = strtotime($inv['invoice_due']);
-    if ($ts !== false) { $effective_date = date('F j, Y', $ts); }
-
-    // --- Primary contact (client signer) ---
+    // --- Primary contact (client signer) — required for ALL templates ---
     $contact = mysqli_fetch_assoc(mysqli_query($mysqli,
         "SELECT contact_id, contact_name, contact_email
          FROM contacts
@@ -90,19 +128,29 @@ if (isset($_POST['create_documenso_msa'])) {
          LIMIT 1"));
     if (!$contact || empty($contact['contact_email'])) {
         $_SESSION['alert_type'] = "error";
-        $_SESSION['alert_message'] = "Client has no primary contact with an email. Set one before sending the MSA.";
+        $_SESSION['alert_message'] = "Client has no primary contact with an email. Set one before sending.";
         header("Location: documenso_documents.php");
         exit();
     }
     $contact_id = intval($contact['contact_id']);
 
+    // --- Run the template's prefill profile to gather field values ---
+    $profile = $template['prefill_profile'] ?? 'none';
+    list($values, $prefill_error) = documensoGatherPrefill($mysqli, $profile, $client_id, $business_name);
+    if ($prefill_error !== null) {
+        $_SESSION['alert_type'] = "error";
+        $_SESSION['alert_message'] = $prefill_error;
+        header("Location: documenso_documents.php");
+        exit();
+    }
+
     // --- Approver: explicit override, else default (you) ---
     $approver_name  = $approver_name_in  !== '' ? $approver_name_in  : $cfg['default_approver_name'];
     $approver_email = $approver_email_in !== '' ? $approver_email_in : $cfg['default_approver_email'];
 
-    // --- Resolve template field ids by label ---
-    $fieldIds = documensoResolveFieldIds($cfg);
-    if (!$fieldIds) {
+    // --- Resolve template field ids by label (empty for no-prefill templates) ---
+    $fieldIds = documensoResolveFieldIds($cfg, $template);
+    if ($fieldIds === false) {
         $_SESSION['alert_type'] = "error";
         $_SESSION['alert_message'] = "Could not resolve Documenso template fields by label. Check template labels.";
         header("Location: documenso_documents.php");
@@ -110,16 +158,10 @@ if (isset($_POST['create_documenso_msa'])) {
     }
 
     // --- Create envelope ---
-    $values = [
-        'business_name'    => $business_name,
-        'business_address' => $business_address,
-        'monthly_rate'     => $monthly_rate,
-        'effective_date'   => $effective_date,
-    ];
     $signer   = ['name' => $contact['contact_name'], 'email' => $contact['contact_email']];
     $approver = ['name' => $approver_name, 'email' => $approver_email];
 
-    list($code, $body) = documensoCreateEnvelope($cfg, $fieldIds, $values, $signer, $approver);
+    list($code, $body) = documensoCreateEnvelope($cfg, $template, $fieldIds, $values, $signer, $approver);
     if ($code !== 200 || !is_array($body) || empty($body['id'])) {
         $_SESSION['alert_type'] = "error";
         $_SESSION['alert_message'] = "Documenso create failed (HTTP $code). Check logs.";
@@ -142,19 +184,21 @@ if (isset($_POST['create_documenso_msa'])) {
     $status = (is_array($sbody) && !empty($sbody['status'])) ? ucfirst(strtolower($sbody['status'])) : 'Pending';
 
     // --- Store the document record ---
-    $title = mysqli_real_escape_string($mysqli, "MSA - " . $business_name);
+    $label = $template['label'] ?? $template_key;
+    $title = mysqli_real_escape_string($mysqli, $label . " - " . $business_name);
+    $type_esc        = mysqli_real_escape_string($mysqli, $template_key);
     $envelope_id_esc = mysqli_real_escape_string($mysqli, $envelope_id);
-    $tmpl_env_esc = mysqli_real_escape_string($mysqli, $cfg['template_envelope_id']);
+    $tmpl_env_esc    = mysqli_real_escape_string($mysqli, $template['template_envelope_id'] ?? '');
     $bn = mysqli_real_escape_string($mysqli, $business_name);
-    $ba = mysqli_real_escape_string($mysqli, $business_address);
-    $mr = mysqli_real_escape_string($mysqli, $monthly_rate);
-    $ed = mysqli_real_escape_string($mysqli, $effective_date);
+    $ba = mysqli_real_escape_string($mysqli, $values['business_address'] ?? '');
+    $mr = mysqli_real_escape_string($mysqli, $values['monthly_rate'] ?? '');
+    $ed = mysqli_real_escape_string($mysqli, $values['effective_date'] ?? '');
     $status_esc = mysqli_real_escape_string($mysqli, $status);
     $numeric_sql = $numeric_id !== null ? intval($numeric_id) : "NULL";
 
     mysqli_query($mysqli, "INSERT INTO documenso_documents SET
         documenso_document_title = '$title',
-        documenso_document_type = 'msa',
+        documenso_document_type = '$type_esc',
         documenso_document_envelope_id = '$envelope_id_esc',
         documenso_document_numeric_id = $numeric_sql,
         documenso_document_template_envelope_id = '$tmpl_env_esc',
@@ -188,14 +232,14 @@ if (isset($_POST['create_documenso_msa'])) {
             documenso_recipient_document_id = $doc_id");
     }
 
-    documensoAddHistory($mysqli, $doc_id, 'Created', "MSA created and sent for $business_name by $session_name", $_SERVER['REMOTE_ADDR'] ?? null);
+    documensoAddHistory($mysqli, $doc_id, 'Created', "$label created and sent for $business_name by $session_name", $_SERVER['REMOTE_ADDR'] ?? null);
 
     if (function_exists('customAction')) {
         customAction('documenso_document_create', $doc_id);
     }
 
     $_SESSION['alert_type'] = "success";
-    $_SESSION['alert_message'] = "MSA created and sent for signing.";
+    $_SESSION['alert_message'] = "$label created and sent for signing.";
     header("Location: documenso_document.php?documenso_document_id=$doc_id");
     exit();
 }
