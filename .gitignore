@@ -1,0 +1,8 @@
+# Real plugin configuration with live secrets — never commit.
+# Copy documenso_config.example.php to documenso_config.php and fill in.
+agent/custom/documenso_config.php
+
+# Editor / OS noise
+*.swp
+*.swo
+.DS_Store
