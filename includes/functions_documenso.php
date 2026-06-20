@@ -220,7 +220,9 @@ function documensoCreateEnvelope($cfg, $template, $fieldIds, $values, $signer, $
             ['id' => $r['approver_id'],      'email' => $approver['email'], 'name' => $approver['name']],
         ],
         'distributeDocument' => false,
-        'override' => ['distributionMethod' => 'NONE'],
+        // EMAIL = Documenso emails each recipient their signing link on
+        // distribute. (Was NONE = generate links only, distribute by hand.)
+        'override' => ['distributionMethod' => 'EMAIL'],
     ];
     if (!empty($prefillFields)) {
         $payload['prefillFields'] = $prefillFields;
@@ -230,13 +232,14 @@ function documensoCreateEnvelope($cfg, $template, $fieldIds, $values, $signer, $
 }
 
 /**
- * Distribute an envelope (method NONE) to activate signing without email.
- * REQUIRED — without this, signing URLs 404. Returns [http_code, decoded].
+ * Distribute an envelope (method EMAIL) to activate signing AND email each
+ * recipient their signing link. REQUIRED — without distribute, signing URLs
+ * 404. Returns [http_code, decoded].
  */
 function documensoDistribute($cfg, $envelopeId) {
     return documensoApiPostJson($cfg, '/envelope/distribute', [
         'envelopeId' => $envelopeId,
-        'meta' => ['distributionMethod' => 'NONE'],
+        'meta' => ['distributionMethod' => 'EMAIL'],
     ]);
 }
 
